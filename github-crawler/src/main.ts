@@ -31,18 +31,12 @@ async function main() {
       role: "system",
       parts: [
         {
-          text: default_system_instruction
+          text: `$default_system_instruction}
+          \n\n
+          If there is an error found for any of the error types, just tell me if there is an error. I don't care which which it is. Just return the structured data field hasErrors as true if there is an error.`
         },
       ],
     },
-    {
-      role: "system",
-      parts: [
-        {
-          text: "If there is an error found for any of the error types, just tell me if there is an error. I don't care which which it is. Just return the structured data field hasErrors as true if there is an error."
-        }
-      ]
-    }
   ];
 
   const response = await ai.models.generateContentStream({
