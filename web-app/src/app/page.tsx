@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Box, Paper, Typography, TextField, Button, Avatar, IconButton, Chip, CircularProgress } from "@mui/material"
+import { Box, Paper, Typography, TextField, Button, Avatar, IconButton, Chip, CircularProgress} from "@mui/material"
 import SendIcon from "@mui/icons-material/Send"
 import CodeIcon from "@mui/icons-material/Code"
 import PlayArrowIcon from "@mui/icons-material/PlayArrow"
 import ContentCopyIcon from "@mui/icons-material/ContentCopy"
+import { AutoAwesome } from "@mui/icons-material"
 import TerminalIcon from "@mui/icons-material/Terminal"
 import AddIcon from "@mui/icons-material/Add"
 import CloseIcon from "@mui/icons-material/Close"
@@ -13,6 +14,7 @@ import LightModeIcon from "@mui/icons-material/LightMode"
 import DarkModeIcon from "@mui/icons-material/DarkMode"
 import { useTheme } from "@/lib/theme-context"
 import CodeEditor from "@/app/components/ui/code-editor"
+import CodeDiffView from "@/app/components/ui/CodeDiffView"
 import CodeSandbox from "@/app/components/code-sandbox"
 import ReactMarkdown from 'react-markdown'
 
@@ -29,7 +31,7 @@ export default function ChatWindow() {
   }[]>([
     {
       role: "assistant",
-      content: "Hi there! I'm Google Gemini. How can I help you today?",
+      content: "Hi there! I'm your coding assistant. How can I help you today?",
       timestamp: new Date(),
     },
   ])
@@ -64,6 +66,15 @@ export default function ChatWindow() {
       activeFile: "file1",
     },
   })
+  // New state for code suggestions
+  const [codeSuggestion, setCodeSuggestion] = useState<{
+    fileId: string
+    originalCode: string
+    suggestedCode: string
+    language: string
+    message?: string
+    isActive: boolean
+  } | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -291,6 +302,57 @@ export default function ChatWindow() {
       ? "linear-gradient(90deg, #6B66FF 0%, #9370DB 100%)"
       : "linear-gradient(90deg, #5550E3 0%, #7952D1 100%)"
   }
+
+/* CHANGE */
+
+  // Function to demonstrate code suggestion feature
+  const generateSampleSuggestion = () => {
+    // Get current file content
+    const currentSandbox = sandboxes[activeSandbox];
+    const currentFileId = currentSandbox.activeFile;
+    const currentFile = codeFiles.find((file) => file.id === currentFileId);
+    
+    if (!currentFile) return;
+    
+    // Create a sample suggestion
+    let suggestedCode = currentFile.content;
+    
+    // Make different suggestions based on file type
+    if (currentFile.language === "javascript" || currentFile.language === "jsx") {
+      // Suggest adding comments and improving variable names
+      if (suggestedCode.includes("console.log")) {
+        suggestedCode = suggestedCode.replace(
+          /console\.log\((.*)\)/g, 
+          "// Output the result to console\nconsole.log($1) // Consider using more descriptive logging"
+        );
+      } else {
+        // Add a sample function with good practices
+        suggestedCode += "\n\n/**\n * Calculate sum of two numbers\n * @param {number} a - First number\n * @param {number} b - Second number\n * @returns {number} Sum of a and b\n */\nfunction calculateSum(a, b) {\n  return a + b;\n}\n";
+      }
+    } else if (currentFile.language === "css") {
+      // Suggest using variables and better practices
+      suggestedCode = suggestedCode.replace(
+        /background: linear-gradient.*;/g,
+        "/* Use CSS variables for consistent theming */\n--primary-gradient: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);\nbackground: var(--primary-gradient);"
+      );
+    }
+    
+    // Set the suggestion
+    setCodeSuggestion({
+      fileId: currentFileId,
+      originalCode: currentFile.content,
+      suggestedCode: suggestedCode,
+      language: currentFile.language,
+      isActive: true
+    });
+  };
+
+  const messagesStartRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll to top when new messages arrive
+  useEffect(() => {
+    messagesStartRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
 
   return (
     <Box
@@ -553,7 +615,7 @@ export default function ChatWindow() {
               >
                 <CircularProgress size={20} sx={{ color: "#9370DB" }} />
                 <Typography variant="body2" sx={{ color: mode === "light" ? "#666" : "#aaa" }}>
-                  Gemini is thinking...
+                  Thinking...
                 </Typography>
               </Paper>
             </Box>
@@ -690,6 +752,67 @@ export default function ChatWindow() {
           </Box>
         </Box>
 
+        {/* Action buttons for code sandbox */}
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "flex-end",
+            padding: "8px 24px",
+            background: mode === "light"
+              ? "linear-gradient(90deg, rgba(107,102,255,0.05) 0%, rgba(147,112,219,0.05) 100%)"
+              : "linear-gradient(90deg, rgba(107,102,255,0.1) 0%, rgba(147,112,219,0.1) 100%)",
+            gap: 1,
+          }}
+        >
+          <Button
+            variant="contained"
+            size="small"
+            onClick={() => {
+              navigator.clipboard.writeText(getCurrentFileContent())
+            }}
+            sx={{
+              background: mode === "light" ? "rgba(255,255,255,0.8)" : "rgba(50,50,50,0.8)",
+              color: mode === "light" ? "text.secondary" : "#e0e0e0",
+              "&:hover": {
+                background: mode === "light" ? "rgba(255,255,255,0.95)" : "rgba(60,60,60,0.95)",
+              },
+            }}
+            startIcon={<ContentCopyIcon />}
+          >
+            Copy
+          </Button>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={generateSampleSuggestion}
+            sx={{
+              background: "linear-gradient(90deg, #9370DB 0%, #6B66FF 100%)",
+              color: "white",
+              "&:hover": {
+                background: "linear-gradient(90deg, #8360CB 0%, #5B56EF 100%)",
+              },
+            }}
+          >
+            <AutoAwesome/>
+          </Button>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={executeCode}
+            disabled={isExecuting}
+            sx={{
+              background: "linear-gradient(90deg, #FF9E2C 0%, #FF6B6B 100%)",
+              color: "white",
+              "&:hover": {
+                background: "linear-gradient(90deg, #FF8E1C 0%, #FF5B5B 100%)",
+              },
+            }}
+            startIcon={<PlayArrowIcon />}
+          >
+            Run
+          </Button>
+        </Box>
+
         {/* File tabs */}
         <Box
           sx={{
@@ -784,57 +907,41 @@ export default function ChatWindow() {
 
         {/* Code editor */}
         <Box sx={{ flexGrow: 1, overflow: "hidden", position: "relative" }}>
-          <CodeEditor
-            value={getCurrentFileContent()}
-            language={getCurrentFileLanguage()}
-            onChange={handleCodeChange}
-            isDarkMode={mode === "dark"}
-          />
+          {/* Show code suggestion if available */}
+          {codeSuggestion && codeSuggestion.isActive && codeSuggestion.fileId === sandboxes[activeSandbox]?.activeFile && (
+            <CodeDiffView 
+              originalCode={codeSuggestion.originalCode}
+              suggestedCode={codeSuggestion.suggestedCode}
+              language={codeSuggestion.language}
+              message={codeSuggestion.message}
+              isDarkMode={mode === "dark"}
+              onAccept={() => {
+                // Update current file content with the suggested code
+                const fileIndex = codeFiles.findIndex((file) => file.id === codeSuggestion.fileId);
+                if (fileIndex !== -1) {
+                  const updatedFiles = [...codeFiles];
+                  updatedFiles[fileIndex].content = codeSuggestion.suggestedCode;
+                  setCodeFiles(updatedFiles);
+                }
+                // Clear the suggestion
+                setCodeSuggestion(null);
+              }}
+              onReject={() => {
+                // Just dismiss the suggestion
+                setCodeSuggestion(null);
+              }}
+            />
+          )}
 
-          <Box
-            sx={{
-              position: "absolute",
-              top: 10,
-              right: 10,
-              display: "flex",
-              gap: 1,
-              zIndex: 10,
-            }}
-          >
-            <Button
-              variant="contained"
-              size="small"
-              onClick={() => {
-                navigator.clipboard.writeText(getCurrentFileContent())
-              }}
-              sx={{
-                background: mode === "light" ? "rgba(255,255,255,0.8)" : "rgba(50,50,50,0.8)",
-                color: mode === "light" ? "text.secondary" : "#e0e0e0",
-                "&:hover": {
-                  background: mode === "light" ? "rgba(255,255,255,0.95)" : "rgba(60,60,60,0.95)",
-                },
-              }}
-              startIcon={<ContentCopyIcon />}
-            >
-              Copy
-            </Button>
-            <Button
-              variant="contained"
-              size="small"
-              onClick={executeCode}
-              disabled={isExecuting}
-              sx={{
-                background: "linear-gradient(90deg, #FF9E2C 0%, #FF6B6B 100%)",
-                color: "white",
-                "&:hover": {
-                  background: "linear-gradient(90deg, #FF8E1C 0%, #FF5B5B 100%)",
-                },
-              }}
-              startIcon={<PlayArrowIcon />}
-            >
-              Run
-            </Button>
-          </Box>
+          {/* Only show the editor when there's no active suggestion or if we're viewing a different file */}
+          {!codeSuggestion?.isActive || codeSuggestion.fileId !== sandboxes[activeSandbox]?.activeFile ? (
+            <CodeEditor
+              value={getCurrentFileContent()}
+              language={getCurrentFileLanguage()}
+              onChange={handleCodeChange}
+              isDarkMode={mode === "dark"}
+            />
+          ) : null}
         </Box>
 
         {/* Console output */}
