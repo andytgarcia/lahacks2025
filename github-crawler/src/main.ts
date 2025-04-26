@@ -1,45 +1,60 @@
 import { context, getOctokit } from "@actions/github";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { formatPRCodeForGemini, getChatWebUrl, getPRCodeAsString } from "./shared.types";
+import { default_system_instruction } from "gemini-prompts/prompts";
 
 async function main() {
   const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY || "",
   });
-  const config = {
-    responseMimeType: "text/plain",
-  };
   const model = "gemini-2.0-flash";
 
   const prCode = await getPRCodeAsString(context.repo.owner, context.repo.repo, context.payload.pull_request!.number.toString(), process.env.GITHUB_TOKEN!);
 
   const formattedPRCode = formatPRCodeForGemini(prCode.files);
 
-  console.log("Formatted PR Code:", formattedPRCode);
+  const chatConfig = {
+    responseMimeType: 'application/json',
+    responseSchema: {
+      type: Type.OBJECT,
+      required: ["hasErrors"],
+      properties: {
+        hasErrors: {
+          type: Type.BOOLEAN,
+        },
+      },
+    },
+  };
 
   const contents = [
     {
-      role: "user",
+      role: "system",
       parts: [
         {
-          text: `Please review the code I'm going to give you and tell me if it could be better. I want you to really teach me and help me learn. Please make it much more concise. Maybe like a couple of sentences.
-
-Code:
-print("Hello, world!")`,
+          text: default_system_instruction
         },
       ],
     },
+    {
+      role: "system",
+      parts: [
+        {
+          text: "If there is an error found for any of the error types, just tell me if there is an error. I don't care which which it is. Just return the structured data field hasErrors as true if there is an error."
+        }
+      ]
+    }
   ];
 
   const response = await ai.models.generateContentStream({
     model,
-    config,
+    config: chatConfig,
     contents,
   });
 
   let entireResponse = "";
 
   for await (const chunk of response) {
+    console.log(chunk);
     entireResponse += chunk.text;
   }
 
@@ -55,7 +70,7 @@ print("Hello, world!")`,
     owner,
     repo,
     issue_number: pr.number,
-    body: `🤖 ${formattedPRCode}`,
+    body: `🤖 ${entireResponse}`,
   });
 }
 
