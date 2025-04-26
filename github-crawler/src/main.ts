@@ -6,7 +6,7 @@ import {
 
 async function main() {
   const ai = new GoogleGenAI({
-    // project: process.env.GCP_PROJECT_ID!,
+    apiKey: process.env.GEMINI_API_KEY || '',
   });
   const config = {
     responseMimeType: 'text/plain',
