@@ -102,7 +102,13 @@ export default function ChatWindow() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: input }),
+        //body: JSON.stringify({ message: input }),
+        body: JSON.stringify({ 
+          message: input,
+          repo: 'lahacks2025',
+          prNumber: '1',
+          owner: 'andytgarcia'
+        }),
       });
 
       if (!response.ok) {
