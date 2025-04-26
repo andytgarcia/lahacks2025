@@ -1,9 +1,12 @@
 name: Gemini PR Bot
 
-# run on PR opened, reopened, or updated ("synchronize")
 on:
   pull_request:
     types: [opened, reopened, synchronize]
+
+permissions:
+  pull-requests: write
+  contents: read
 
 jobs:
   gemini-check:

@@ -3,12 +3,13 @@ import { context, getOctokit }    from '@actions/github';
 async function main() {
   const octokit = getOctokit(process.env.GITHUB_TOKEN!);
   const { owner, repo } = context.repo;
+  const pr = context.payload.pull_request!;
 
   await octokit.rest.issues.createComment({
     owner,
     repo,
-    issue_number: 1,
-    body: `🤖 Gemini review says:\n> ${owner}`,
+    issue_number: pr.number,
+    body: `🤖 Gemini review says:\n> Testing permissions`,
   });
 //   // 1. Build a prompt from the PR title/body
 //   const pr = context.payload.pull_request!;
