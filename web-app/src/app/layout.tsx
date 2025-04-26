@@ -1,3 +1,5 @@
+"use client";
+
 import type React from "react"
 import { Providers } from "./providers"
 import { ThemeProvider } from "@/lib/theme-context"
@@ -16,9 +18,11 @@ export default function RootLayout({
         />
       </head>
       <body>
+        <div>
         <ThemeProvider>
           <Providers>{children}</Providers>
         </ThemeProvider>
+        </div>
       </body>
     </html>
   )

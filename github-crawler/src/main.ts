@@ -9,7 +9,7 @@ async function main() {
   const config = {
     responseMimeType: "text/plain",
   };
-  const model = "gemini-2.5-flash-preview-04-17";
+  const model = "gemini-2.0-flash";
 
   const contents = [
     {
