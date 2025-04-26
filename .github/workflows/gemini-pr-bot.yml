@@ -1,9 +1,12 @@
 name: Gemini PR Bot
 
-# run on PR opened, reopened, or updated ("synchronize")
 on:
   pull_request:
     types: [opened, reopened, synchronize]
+
+permissions:
+  pull-requests: write
+  contents: read
 
 jobs:
   gemini-check:
@@ -32,5 +35,6 @@ jobs:
         working-directory: github-crawler
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-          GITHUB_TOKEN:     ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: npx ts-node src/main.ts
