@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Box, Paper, Typography, TextField, Button, Avatar, IconButton, Chip } from "@mui/material"
+import { Box, Paper, Typography, TextField, Button, Avatar, IconButton, Chip, CircularProgress } from "@mui/material"
 import SendIcon from "@mui/icons-material/Send"
 import CodeIcon from "@mui/icons-material/Code"
 import PlayArrowIcon from "@mui/icons-material/PlayArrow"
@@ -14,10 +14,12 @@ import DarkModeIcon from "@mui/icons-material/DarkMode"
 import { useTheme } from "@/lib/theme-context"
 import CodeEditor from "@/app/components/ui/code-editor"
 import CodeSandbox from "@/app/components/code-sandbox"
+import ReactMarkdown from 'react-markdown'
 
 export default function ChatWindow() {
   const { mode, toggleTheme } = useTheme()
   const [input, setInput] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
   const [messages, setMessages] = useState<{
     role: string
     content: string
@@ -70,80 +72,57 @@ export default function ChatWindow() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!input.trim()) return
 
     // Add user message
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "user",
-        content: input,
-        timestamp: new Date(),
-      },
-    ])
+    const userMessage = {
+      role: "user",
+      content: input,
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const codeExample = `function Button({ text, onClick }) {
-  return (
-    <button 
-      style={{
-        padding: '10px 20px',
-        backgroundColor: '#9370DB',
-        color: 'white',
-        border: 'none',
-        borderRadius: '8px',
-        cursor: 'pointer',
-        boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-        transition: 'all 0.3s ease'
-      }}
-      onClick={onClick}
-    >
-      {text}
-    </button>
-  );
-}`
+    try {
+      const response = await fetch('/api/geminichat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: input }),
+      });
 
+      if (!response.ok) {
+        throw new Error('Failed to get response from Gemini');
+      }
+
+      const data = await response.json();
+      
+      // Add assistant's response to messages
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: "I've analyzed your request. Here's a simple example of a React component:",
+          content: data.result.text || "Sorry, I couldn't process that request.",
           timestamp: new Date(),
         },
-        {
-          role: "assistant",
-          content: codeExample,
-          isCode: true,
-          language: "jsx",
-          timestamp: new Date(),
-        },
-      ])
-
-      // Create a new file ID
-      const newFileId = `file${Object.keys(codeFiles).length + 1}`
-
-      // Add the code to files
-      setCodeFiles((prev) => [
+      ]);
+    } catch (error) {
+      console.error('Error:', error);
+      setMessages((prev) => [
         ...prev,
         {
-          id: newFileId,
-          name: "Button.jsx",
-          language: "jsx",
-          content: codeExample,
+          role: "assistant",
+          content: "Sorry, there was an error processing your request.",
+          timestamp: new Date(),
         },
-      ])
-
-      // Add to current sandbox
-      const updatedSandboxes = { ...sandboxes }
-      updatedSandboxes[activeSandbox].files.push(newFileId)
-      updatedSandboxes[activeSandbox].activeFile = newFileId
-      setSandboxes(updatedSandboxes)
-    }, 1000)
-
-    setInput("")
-  }
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -500,15 +479,37 @@ export default function ChatWindow() {
                     </Button>
                   </Box>
                 ) : (
-                  <Typography
-                    variant="body1"
-                    sx={{
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    {message.content}
-                  </Typography>
+                  <Box sx={{ 
+                    '& pre': { 
+                      backgroundColor: mode === 'light' ? '#f5f5f5' : '#2a2a2a',
+                      padding: '1rem',
+                      borderRadius: '4px',
+                      overflowX: 'auto'
+                    },
+                    '& code': {
+                      fontFamily: 'monospace',
+                      fontSize: '0.9em'
+                    },
+                    '& p': {
+                      margin: '0.5em 0'
+                    },
+                    '& ul, & ol': {
+                      paddingLeft: '1.5em',
+                      margin: '0.5em 0'
+                    },
+                    '& h1, & h2, & h3, & h4, & h5, & h6': {
+                      margin: '1em 0 0.5em 0',
+                      fontWeight: 600
+                    },
+                    '& blockquote': {
+                      borderLeft: '4px solid #9370DB',
+                      paddingLeft: '1em',
+                      margin: '1em 0',
+                      color: mode === 'light' ? '#666' : '#aaa'
+                    }
+                  }}>
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  </Box>
                 )}
 
                 <Typography
@@ -529,6 +530,35 @@ export default function ChatWindow() {
               </Paper>
             </Box>
           ))}
+          
+          {/* Loading indicator */}
+          {isLoading && (
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "flex-start",
+                marginBottom: 1,
+              }}
+            >
+              <Paper
+                elevation={3}
+                sx={{
+                  padding: 2,
+                  borderRadius: "20px 20px 20px 5px",
+                  background: mode === "light" ? "#ffffff" : "#2a2a2a",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                }}
+              >
+                <CircularProgress size={20} sx={{ color: "#9370DB" }} />
+                <Typography variant="body2" sx={{ color: mode === "light" ? "#666" : "#aaa" }}>
+                  Gemini is thinking...
+                </Typography>
+              </Paper>
+            </Box>
+          )}
+          
           <div ref={messagesEndRef} />
         </Box>
 
