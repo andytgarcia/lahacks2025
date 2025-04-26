@@ -128,6 +128,6 @@ export async function getPRCodeAsString(owner: string, repo: string, prNumber: s
 
 export function formatPRCodeForGemini(prCode: PRFile[]) {
   return prCode.map((file) => {
-    return `File: ${file.filename}\nStatus: ${file.status}\nPrevious Content: ${file.previousContent}\nNew Content: ${file.newContent}`;
+    return `File: ${file.filename}\nStatus: ${file.status}\nPrevious Content: \n\n${file.previousContent}\nNew Content: \n\n${file.newContent}`;
   }).join("\n");
 }
