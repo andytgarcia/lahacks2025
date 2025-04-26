@@ -60,19 +60,29 @@ async function main() {
     entireResponse += chunk.text;
   }
 
+  const hasErrors = JSON.parse(entireResponse).hasErrors;
+
   const octokit = getOctokit(process.env.GITHUB_TOKEN!);
   const { owner, repo } = context.repo;
   const pr = context.payload.pull_request!;
 
   const chatUrl = getChatWebUrl(owner, repo, pr.number);
 
-  console.log("Chat URL:", chatUrl);
+  let body = ''
+
+  if (hasErrors) {
+    body = `We found some things that could be improved with this PR. \n
+      Take a look in our website to get an in depth overview. \n
+      [View PR Analysis](${chatUrl})`
+  } else {
+    body = `No errors found!`
+  }
 
   await octokit.rest.issues.createComment({
     owner,
     repo,
     issue_number: pr.number,
-    body: `🤖 ${entireResponse}`,
+    body: `body`,
   });
 }
 
