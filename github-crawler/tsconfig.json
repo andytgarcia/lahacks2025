@@ -4,13 +4,17 @@
     "module": "commonjs",
     "lib": ["ES2020", "DOM"],
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": "..",
+    "baseUrl": ".",
+    "paths": {
+      "gemini-prompts/*": ["../gemini-prompts/*"]
+    },
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "../gemini-prompts/**/*"],
   "exclude": ["node_modules", "dist"]
 }
