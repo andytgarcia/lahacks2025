@@ -2,6 +2,7 @@
   "dependencies": {
     "@actions/github": "^6.0.0",
     "@google/genai": "^0.10.0",
+    "@octokit/rest": "^21.1.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   },

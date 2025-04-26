@@ -1,6 +1,6 @@
 import { context, getOctokit } from "@actions/github";
 import { GoogleGenAI } from "@google/genai";
-import { getChatWebUrl } from "./shared.types";
+import { formatPRCodeForGemini, getChatWebUrl, getPRCodeAsString } from "./shared.types";
 
 async function main() {
   const ai = new GoogleGenAI({
@@ -10,6 +10,12 @@ async function main() {
     responseMimeType: "text/plain",
   };
   const model = "gemini-2.0-flash";
+
+  const prCode = await getPRCodeAsString(context.repo.owner, context.repo.repo, context.payload.pull_request!.number.toString(), process.env.GITHUB_TOKEN!);
+
+  const formattedPRCode = formatPRCodeForGemini(prCode.files);
+
+  console.log("Formatted PR Code:", formattedPRCode);
 
   const contents = [
     {
@@ -41,13 +47,15 @@ print("Hello, world!")`,
   const { owner, repo } = context.repo;
   const pr = context.payload.pull_request!;
 
-  const chatUrl = getChatWebUrl(repo, pr.number);
+  const chatUrl = getChatWebUrl(owner, repo, pr.number);
+
+  console.log("Chat URL:", chatUrl);
 
   await octokit.rest.issues.createComment({
     owner,
     repo,
     issue_number: pr.number,
-    body: `🤖 ${entireResponse}\n\n[See how you can improve this PR!](${chatUrl})`,
+    body: `🤖 ${formattedPRCode}`,
   });
 }
 
