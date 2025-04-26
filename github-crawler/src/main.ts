@@ -82,7 +82,7 @@ async function main() {
     owner,
     repo,
     issue_number: pr.number,
-    body: `body`,
+    body: `${body}`,
   });
 }
 
