@@ -1,4 +1,8 @@
-import { Octokit } from "@octokit/rest";
+// Replace static import with a dynamic import function
+export async function createOctokit(token: string) {
+  const { Octokit } = await import('@octokit/rest');
+  return new Octokit({ auth: token });
+}
 
 const PROJECT_BASE_URL = "localhost:3000";
 
@@ -15,7 +19,7 @@ export interface PRFile {
 
 
 export async function getPRCodeAsString(owner: string, repo: string, prNumber: string, token: string) {
-  const octokit = new Octokit({ auth: token });
+  const octokit = await createOctokit(token);
 
   // Get PR details to find base and head references
   const { data: pullRequest } = await octokit.pulls.get({
