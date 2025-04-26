@@ -1,7 +1,7 @@
 import { context, getOctokit } from "@actions/github";
 import { GoogleGenAI, Type } from "@google/genai";
 import { formatPRCodeForGemini, getChatWebUrl, getPRCodeAsString } from "./shared.types";
-import { default_system_instruction } from "gemini-prompts/prompts";
+import { default_system_instruction } from "./prompts-copy";
 
 async function main() {
   const ai = new GoogleGenAI({
