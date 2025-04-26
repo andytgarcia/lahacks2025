@@ -7,9 +7,7 @@ import CodeIcon from "@mui/icons-material/Code"
 import PlayArrowIcon from "@mui/icons-material/PlayArrow"
 import ContentCopyIcon from "@mui/icons-material/ContentCopy"
 import { AutoAwesome } from "@mui/icons-material"
-import TerminalIcon from "@mui/icons-material/Terminal"
 import AddIcon from "@mui/icons-material/Add"
-import CloseIcon from "@mui/icons-material/Close"
 import LightModeIcon from "@mui/icons-material/LightMode"
 import DarkModeIcon from "@mui/icons-material/DarkMode"
 import DeleteIcon from "@mui/icons-material/Delete"
@@ -58,7 +56,6 @@ export default function ChatWindow() {
         "body {\n  font-family: sans-serif;\n  margin: 0;\n  padding: 20px;\n  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);\n}\n\n.container {\n  max-width: 1200px;\n  margin: 0 auto;\n  padding: 20px;\n  border-radius: 8px;\n  background-color: white;\n  box-shadow: 0 4px 6px rgba(0,0,0,0.1);\n}",
     },
   ])
-  const [consoleOutput, setConsoleOutput] = useState("")
   const [isExecuting, setIsExecuting] = useState(false)
   const [activeSandbox, setActiveSandbox] = useState("sandbox1")
   const [sandboxes, setSandboxes] = useState<{
@@ -461,13 +458,6 @@ export default function ChatWindow() {
     return currentSandbox.files
       .map((fileId) => codeFiles.find((file) => file.id === fileId))
       .filter((file): file is { id: string; name: string; language: string; content: string } => file !== undefined)
-  }
-
-  // Get gradient based on theme mode
-  const getHeaderGradient = () => {
-    return mode === "light"
-      ? "linear-gradient(90deg, #FF6B6B 0%, #9370DB 50%, #FF9E2C 100%)"
-      : "linear-gradient(90deg, #FF5151 0%, #7952D1 50%, #E58B1F 100%)"
   }
 
   const getCodeHeaderGradient = () => {
