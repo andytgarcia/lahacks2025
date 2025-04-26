@@ -49,6 +49,8 @@ print("Hello, world!")`,
 
   const chatUrl = getChatWebUrl(owner, repo, pr.number);
 
+  console.log("Chat URL:", chatUrl);
+
   await octokit.rest.issues.createComment({
     owner,
     repo,
