@@ -1,8 +1,5 @@
-// Replace static import with a dynamic import function
-export async function createOctokit(token: string) {
-  const { Octokit } = await import('@octokit/rest');
-  return new Octokit({ auth: token });
-}
+import { getOctokit } from "@actions/github";
+import { RestEndpointMethodTypes } from "@octokit/plugin-rest-endpoint-methods";
 
 const PROJECT_BASE_URL = "localhost:3000";
 
@@ -19,10 +16,10 @@ export interface PRFile {
 
 
 export async function getPRCodeAsString(owner: string, repo: string, prNumber: string, token: string) {
-  const octokit = await createOctokit(token);
+  const octokit = getOctokit(token);
 
   // Get PR details to find base and head references
-  const { data: pullRequest } = await octokit.pulls.get({
+  const { data: pullRequest } = await octokit.rest.pulls.get({
     owner,
     repo,
     pull_number: parseInt(prNumber),
@@ -32,7 +29,7 @@ export async function getPRCodeAsString(owner: string, repo: string, prNumber: s
   const headRef = pullRequest.head.sha;
 
   // Get PR files (changed files)
-  const { data: files } = await octokit.pulls.listFiles({
+  const { data: files } = await octokit.rest.pulls.listFiles({
     owner,
     repo,
     pull_number: parseInt(prNumber),
@@ -41,11 +38,11 @@ export async function getPRCodeAsString(owner: string, repo: string, prNumber: s
   console.log("Files:", files);
 
   const fileContents: PRFile[] = await Promise.all(
-    files.map(async (file) => {
+    files.map(async (file: RestEndpointMethodTypes["pulls"]["listFiles"]["response"]["data"][0]) => {
       // Default structure
       const result: PRFile = {
         filename: file.filename,
-        status: file.status,
+        status: file.status as any,
         previousContent: null,
         newContent: null
       };
@@ -53,7 +50,7 @@ export async function getPRCodeAsString(owner: string, repo: string, prNumber: s
       try {
         // If file was added, only get new content
         if (file.status === 'added') {
-          const { data: content } = await octokit.repos.getContent({
+          const { data: content } = await octokit.rest.repos.getContent({
             owner,
             repo,
             path: file.filename,
@@ -66,7 +63,7 @@ export async function getPRCodeAsString(owner: string, repo: string, prNumber: s
         }
         // If file was removed, only get previous content
         else if (file.status === 'removed') {
-          const { data: content } = await octokit.repos.getContent({
+          const { data: content } = await octokit.rest.repos.getContent({
             owner,
             repo,
             path: file.filename,
@@ -81,7 +78,7 @@ export async function getPRCodeAsString(owner: string, repo: string, prNumber: s
         else if (file.status === 'modified') {
           // Get previous content
           try {
-            const { data: prevContent } = await octokit.repos.getContent({
+            const { data: prevContent } = await octokit.rest.repos.getContent({
               owner,
               repo,
               path: file.filename,
@@ -97,7 +94,7 @@ export async function getPRCodeAsString(owner: string, repo: string, prNumber: s
 
           // Get new content
           try {
-            const { data: newContent } = await octokit.repos.getContent({
+            const { data: newContent } = await octokit.rest.repos.getContent({
               owner,
               repo,
               path: file.filename,
@@ -123,8 +120,8 @@ export async function getPRCodeAsString(owner: string, repo: string, prNumber: s
     files: fileContents,
     summary: {
       totalFiles: files.length,
-      additions: files.reduce((sum, file) => sum + file.additions, 0),
-      deletions: files.reduce((sum, file) => sum + file.deletions, 0),
+      additions: files.reduce((sum: number, file: any) => sum + file.additions, 0),
+      deletions: files.reduce((sum: number, file: any) => sum + file.deletions, 0),
     },
   };
 }
