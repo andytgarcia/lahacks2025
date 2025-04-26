@@ -28,7 +28,7 @@ async function main() {
 
   const contents = [
     {
-      role: "system",
+      role: "user",
       parts: [
         {
           text: `$default_system_instruction}
