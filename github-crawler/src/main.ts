@@ -37,6 +37,14 @@ async function main() {
         },
       ],
     },
+    {
+      role: "user",
+      parts: [
+        {
+          text: formattedPRCode
+        },
+      ],
+    },
   ];
 
   const response = await ai.models.generateContentStream({
