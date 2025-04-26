@@ -12,6 +12,7 @@ import AddIcon from "@mui/icons-material/Add"
 import CloseIcon from "@mui/icons-material/Close"
 import LightModeIcon from "@mui/icons-material/LightMode"
 import DarkModeIcon from "@mui/icons-material/DarkMode"
+import DeleteIcon from "@mui/icons-material/Delete"
 import { useTheme } from "@/lib/theme-context"
 import CodeEditor from "@/app/components/ui/code-editor"
 import CodeDiffView from "@/app/components/ui/CodeDiffView"
@@ -28,13 +29,7 @@ export default function ChatWindow() {
     timestamp: Date
     isCode?: boolean
     language?: string
-  }[]>([
-    {
-      role: "assistant",
-      content: "Hi there! I'm your coding assistant. How can I help you today?",
-      timestamp: new Date(),
-    },
-  ])
+  }[]>([])
   const [codeFiles, setCodeFiles] = useState([
     {
       id: "file1",
@@ -78,6 +73,56 @@ export default function ChatWindow() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  // Load messages from localStorage on component mount
+  useEffect(() => {
+    const savedMessages = localStorage.getItem('geminiChatMessages');
+    if (savedMessages) {
+      try {
+        const parsedMessages = JSON.parse(savedMessages);
+        // Convert string timestamps back to Date objects
+        const messagesWithDates = parsedMessages.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        }));
+        setMessages(messagesWithDates);
+      } catch (error) {
+        console.error('Error loading messages from localStorage:', error);
+        // If there's an error, start with the default message
+        setMessages([{
+          role: "assistant",
+          content: "Hi there! I'm your coding assistant. How can I help you today?",
+          timestamp: new Date(),
+        }]);
+      }
+    } else {
+      // If no saved messages, start with the default message
+      setMessages([{
+        role: "assistant",
+        content: "Hi there! I'm your coding assistant. How can I help you today?",
+        timestamp: new Date(),
+      }]);
+    }
+  }, []);
+
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('geminiChatMessages', JSON.stringify(messages));
+    } catch (error) {
+      console.error('Error saving messages to localStorage:', error);
+    }
+  }, [messages]);
+
+  // Add a function to clear chat history
+  const clearChatHistory = () => {
+    setMessages([{
+      role: "assistant",
+      content: "Hi there! I'm your coding assistant. How can I help you today?",
+      timestamp: new Date(),
+    }]);
+    localStorage.removeItem('geminiChatMessages');
+  };
+
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -97,14 +142,20 @@ export default function ChatWindow() {
     setIsLoading(true);
 
     try {
+      // Format messages for the API
+      const formattedMessages = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
       const response = await fetch('/api/geminichat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        //body: JSON.stringify({ message: input }),
         body: JSON.stringify({ 
           message: input,
+          messages: formattedMessages, // Include chat history
           repo: 'lahacks2025',
           prNumber: '1',
           owner: 'andytgarcia'
@@ -389,48 +440,20 @@ export default function ChatWindow() {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            background: getHeaderGradient(),
-            padding: "16px 24px",
+            p: 2,
+            borderBottom: "1px solid",
+            borderColor: "divider",
           }}
         >
+          <Typography variant="h6">Gemini Chat</Typography>
           <Box>
-            <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>
-              awesome-project/frontend
-            </Typography>
-            <Typography
-              variant="subtitle1"
-              sx={{
-                color: "rgba(255,255,255,0.9)",
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              <Box
-                component="span"
-                sx={{
-                  display: "inline-block",
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  backgroundColor: "#4CAF50",
-                  marginRight: 1,
-                }}
-              />
-              Pull Request #42
-            </Typography>
+            <IconButton onClick={clearChatHistory} title="Clear chat history">
+              <DeleteIcon />
+            </IconButton>
+            <IconButton onClick={toggleTheme}>
+              {mode === "light" ? <DarkModeIcon /> : <LightModeIcon />}
+            </IconButton>
           </Box>
-          <IconButton
-            onClick={toggleTheme}
-            sx={{
-              color: "white",
-              backgroundColor: "rgba(255,255,255,0.2)",
-              "&:hover": {
-                backgroundColor: "rgba(255,255,255,0.3)",
-              },
-            }}
-          >
-            {mode === "light" ? <DarkModeIcon /> : <LightModeIcon />}
-          </IconButton>
         </Box>
 
         {/* Messages area */}

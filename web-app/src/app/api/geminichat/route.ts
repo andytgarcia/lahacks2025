@@ -22,22 +22,31 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "API key or Github token not configured" }, { status: 500 });
     }
 
-    const { message, repo, prNumber, owner } = await request.json();
+    const { message, messages, repo, prNumber, owner } = await request.json();
     if (!message || !repo || !prNumber || !owner) {
       return Response.json({ error: "Message, repo, and prNumber are required" }, { status: 400 });
     }
 
     const prCode = await getPRCodeAsString(owner, repo, prNumber, githubToken);
-
     const formattedPRCode = formatPRCodeForGemini(prCode.files);
-
-    console.log("Formatted PR Code:", formattedPRCode);
     
     const ai = new GoogleGenAI({apiKey: key});
     
+    // Format the chat history for Gemini
+    const chatHistory = messages ? messages.map((msg: any) => ({
+      role: msg.role === 'user' ? 'user' : 'model',
+      parts: [{ text: msg.content }]
+    })) : [];
+
+    // Add the current message
+    const currentMessage = {
+      role: 'user',
+      parts: [{ text: message }]
+    };
+
     const response = await ai.models.generateContent({
       model: "gemini-2.0-flash",
-      contents: message,
+      contents: [...chatHistory, currentMessage],
     });
 
     // Log the response structure for debugging
