@@ -71,18 +71,22 @@ async function main() {
   let body = ''
 
   if (hasErrors) {
-    body = `We found some things that could be improved with this PR. \n
-      Take a look in our website to get an in depth overview. \n
-      [View PR Analysis](${chatUrl})`
+    body = `## PR Review Results 🔍
+    
+We found some issues that could be improved with this PR.
+
+[**View Detailed PR Analysis**](${chatUrl})`
   } else {
-    body = `No errors found!`
+    body = `## PR Review Results ✅
+    
+No issues found! Your code looks great.`
   }
 
   await octokit.rest.issues.createComment({
     owner,
     repo,
     issue_number: pr.number,
-    body: `${body}`,
+    body: body,
   });
 }
 
