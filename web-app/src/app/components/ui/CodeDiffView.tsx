@@ -1,211 +1,239 @@
-"use client"
-
-import { Box, Paper, Typography, Button } from "@mui/material"
-import ThumbUpIcon from "@mui/icons-material/ThumbUp"
-import ThumbDownIcon from "@mui/icons-material/ThumbDown"
+import React from 'react';
+import { Box, Button, Paper, Typography } from '@mui/material';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { tomorrow, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { diffLines } from 'diff';
 
 interface CodeDiffViewProps {
-  originalCode: string
-  suggestedCode: string
-  language: string
-  title?: string
-  message?: string
-  isDarkMode?: boolean
-  onAccept?: () => void
-  onReject?: () => void
+  originalCode: string;
+  suggestedCode: string;
+  language: string;
+  message?: string;
+  isDarkMode: boolean;
+  onAccept: () => void;
+  onReject: () => void;
 }
 
-export default function CodeDiffView({
+const CodeDiffView: React.FC<CodeDiffViewProps> = ({
   originalCode,
   suggestedCode,
+  language,
   message,
-  isDarkMode = false,
+  isDarkMode,
   onAccept,
   onReject,
-}: CodeDiffViewProps) {
-  // Modified diff highlighting to show suggested changes on top of the original code
-  const highlightDifferences = () => {
-    const originalLines = originalCode.split('\n')
-    const suggestedLines = suggestedCode.split('\n')
-    
-    const maxLines = Math.max(originalLines.length, suggestedLines.length)
-    const result = []
-    
-    for (let i = 0; i < maxLines; i++) {
-      const originalLine = originalLines[i] || ''
-      const suggestedLine = suggestedLines[i] || ''
-      
-      if (originalLine !== suggestedLine) {
-        result.push(
-          <Box key={`line-${i}`} sx={{ display: 'flex', flexDirection: 'column', width: '100%', mb: 1 }}>
-            {/* Suggested line (shown on top) */}
-            <Box 
-              component="span" 
-              sx={{ 
-                backgroundColor: 'rgba(80, 200, 120, 0.2)', 
-                display: 'block',
-                width: '100%',
-                px: 1,
-                py: 0.5,
-                borderLeft: '3px solid #50c878',
-                position: 'relative',
-                '&::before': {
-                  content: '"+  "',
-                  color: '#50c878',
-                  fontWeight: 'bold',
-                }
-              }}
-            >
-              {suggestedLine}
-            </Box>
-            
-            {/* Original line (shown below) */}
-            <Box 
-              component="span" 
-              sx={{ 
-                backgroundColor: 'rgba(255, 80, 80, 0.2)', 
-                display: 'block',
-                width: '100%',
-                px: 1,
-                py: 0.5,
-                borderLeft: '3px solid #ff5050',
-                position: 'relative',
-                '&::before': {
-                  content: '"-  "',
-                  color: '#ff5050',
-                  fontWeight: 'bold',
-                }
-              }}
-            >
-              {originalLine}
-            </Box>
-          </Box>
-        )
-      } else {
-        result.push(
-          <div key={`line-${i}`} style={{ padding: '3px 0' }}>
-            {suggestedLine}
-          </div>
-        )
-      }
-    }
-    
-    return result
-  }
-
+}) => {
+  const codeStyle = isDarkMode ? tomorrow : oneLight;
+  const normalizedLanguage = normalizeLanguage(language);
+  
+  // Generate the diff between original and suggested code
+  const differences = diffLines(originalCode, suggestedCode);
+  
   return (
-    <Paper
-      elevation={3}
+    <Box 
       sx={{
-        overflow: "hidden",
-        borderRadius: 2,
-        border: "1px solid",
-        borderColor: isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
-        background: isDarkMode ? "#252525" : "#f8f9fa",
-        marginTop: 1,
-        marginBottom: 1,
+        position: 'relative',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "8px 16px",
-          background: isDarkMode
-            ? "linear-gradient(90deg, rgba(80,200,120,0.2) 0%, rgba(147,112,219,0.2) 100%)"
-            : "linear-gradient(90deg, rgba(80,200,120,0.1) 0%, rgba(147,112,219,0.1) 100%)",
-          borderBottom: "1px solid",
-          borderColor: isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
+      <Paper 
+        elevation={3} 
+        sx={{ 
+          padding: 2, 
+          mb: 2, 
+          backgroundColor: isDarkMode ? 'rgba(42,42,42,0.95)' : 'rgba(255,255,255,0.95)',
+          borderLeft: '4px solid',
+          borderColor: 'primary.main',
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
         }}
       >
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-          }}
-        >
-          <Typography
-            variant="subtitle2"
-            sx={{
-              fontFamily: "monospace",
-              color: isDarkMode ? "#e0e0e0" : "text.secondary",
-              fontWeight: 600,
+        <Typography variant="h6" sx={{ mb: 1 }}>
+          Code Suggestion
+        </Typography>
+        
+        {message && (
+          <Typography 
+            variant="body2" 
+            sx={{ 
+              mb: 2, 
+              fontStyle: 'italic',
+              color: isDarkMode ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)' 
             }}
           >
-          </Typography>
-        </Box>
-      </Box>
-      
-      {message && (
-        <Box
-          sx={{
-            padding: "8px 16px",
-            backgroundColor: isDarkMode ? "rgba(80,200,120,0.1)" : "rgba(80,200,120,0.05)",
-            borderBottom: "1px solid",
-            borderColor: isDarkMode ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
-          }}
-        >
-          <Typography variant="body2" sx={{ fontStyle: "italic", color: isDarkMode ? "#b0b0b0" : "#666" }}>
             {message}
           </Typography>
+        )}
+        
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+          <Button 
+            variant="outlined" 
+            color="error" 
+            size="small" 
+            onClick={onReject}
+            startIcon={<CloseIcon />}
+          >
+            Reject
+          </Button>
+          <Button 
+            variant="contained" 
+            color="success" 
+            size="small" 
+            onClick={onAccept}
+            startIcon={<CheckIcon />}
+          >
+            Accept
+          </Button>
         </Box>
-      )}
-      
-      <Box
-        sx={{
-          padding: 2,
-          background: isDarkMode ? "#1e1e1e" : "#282c34",
-          overflowX: "auto",
-          overflowY: "auto", // Added vertical scrolling
-          maxHeight: "400px", // Added maximum height to enable scrolling
-          fontFamily: "monospace",
-          fontSize: "0.875rem",
-          color: "#abb2bf",
-          position: "relative",
-          lineHeight: 1.5,
-        }}
-      >
-        <pre style={{ margin: 0 }}>
-          {highlightDifferences()}
-        </pre>
-      </Box>
-      
-      <Box
-        sx={{
-          padding: 1,
-          display: "flex",
-          justifyContent: "flex-end",
-          borderTop: "1px solid",
-          borderColor: isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
-          gap: 1,
-        }}
-      >
-        <Button
-          size="small"
-          startIcon={<ThumbDownIcon />}
-          onClick={onReject}
+      </Paper>
+
+      <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+        <Paper
           sx={{
-            textTransform: "none",
-            color: isDarkMode ? "#e0e0e0" : "text.secondary",
+            overflow: 'auto',
+            backgroundColor: isDarkMode ? '#1e1e1e' : '#f8f8f8',
+            height: '100%',
           }}
         >
-          Reject
-        </Button>
-        <Button
-          size="small"
-          variant="contained"
-          startIcon={<ThumbUpIcon />}
-          onClick={onAccept}
-          sx={{
-            textTransform: "none",
-            background: "linear-gradient(90deg, #50c878 0%, #4CAF50 100%)",
-            color: "white",
-          }}
-        >
-          Accept Suggestion
-        </Button>
+          <Box sx={{ padding: '0.5rem' }}>
+            {differences.map((part, index) => (
+              <div key={index}>
+                {part.added && (
+                  <div
+                    style={{
+                      backgroundColor: isDarkMode ? 'rgba(0, 100, 0, 0.3)' : 'rgba(0, 200, 0, 0.15)',
+                      padding: '2px 0',
+                      position: 'relative',
+                      borderLeft: '3px solid',
+                      borderColor: '#4caf50',
+                      paddingLeft: '8px',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    <SyntaxHighlighter
+                      language={normalizedLanguage}
+                      style={codeStyle}
+                      customStyle={{
+                        margin: 0,
+                        padding: '5px',
+                        backgroundColor: 'transparent',
+                        borderRadius: 0,
+                      }}
+                    >
+                      {part.value}
+                    </SyntaxHighlighter>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        position: 'absolute',
+                        right: '5px',
+                        top: '0',
+                        color: isDarkMode ? '#4caf50' : '#2e7d32',
+                        backgroundColor: isDarkMode ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.7)',
+                        padding: '0 4px',
+                        borderRadius: '2px',
+                      }}
+                    >
+                      + Added
+                    </Typography>
+                  </div>
+                )}
+                {part.removed && (
+                  <div
+                    style={{
+                      backgroundColor: isDarkMode ? 'rgba(100, 0, 0, 0.3)' : 'rgba(200, 0, 0, 0.15)',
+                      padding: '2px 0',
+                      position: 'relative',
+                      borderLeft: '3px solid',
+                      borderColor: '#f44336',
+                      paddingLeft: '8px',
+                      marginBottom: '4px',
+                      textDecoration: 'line-through',
+                      opacity: 0.7,
+                    }}
+                  >
+                    <SyntaxHighlighter
+                      language={normalizedLanguage}
+                      style={codeStyle}
+                      customStyle={{
+                        margin: 0,
+                        padding: '5px',
+                        backgroundColor: 'transparent',
+                        borderRadius: 0,
+                        textDecoration: 'line-through',
+                        opacity: 0.7,
+                      }}
+                    >
+                      {part.value}
+                    </SyntaxHighlighter>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        position: 'absolute',
+                        right: '5px',
+                        top: '0',
+                        color: isDarkMode ? '#f44336' : '#c62828',
+                        backgroundColor: isDarkMode ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.7)',
+                        padding: '0 4px',
+                        borderRadius: '2px',
+                      }}
+                    >
+                      - Removed
+                    </Typography>
+                  </div>
+                )}
+                {!part.added && !part.removed && (
+                  <div>
+                    <SyntaxHighlighter
+                      language={normalizedLanguage}
+                      style={codeStyle}
+                      customStyle={{
+                        margin: 0,
+                        padding: '5px',
+                        backgroundColor: 'transparent',
+                        borderRadius: 0,
+                      }}
+                    >
+                      {part.value}
+                    </SyntaxHighlighter>
+                  </div>
+                )}
+              </div>
+            ))}
+          </Box>
+        </Paper>
       </Box>
-    </Paper>
-  )
-}
+    </Box>
+  );
+};
+
+// Helper function to normalize language identifiers
+const normalizeLanguage = (language: string): string => {
+  const languageMap: Record<string, string> = {
+    'js': 'javascript',
+    'ts': 'typescript',
+    'jsx': 'jsx',
+    'tsx': 'tsx',
+    'py': 'python',
+    'rb': 'ruby',
+    'java': 'java',
+    'c': 'c',
+    'cpp': 'cpp',
+    'cs': 'csharp',
+    'html': 'html',
+    'css': 'css',
+    'json': 'json',
+    'md': 'markdown',
+    'yml': 'yaml',
+    'yaml': 'yaml',
+  };
+
+  return languageMap[language.toLowerCase()] || language.toLowerCase();
+};
+
+export default CodeDiffView;

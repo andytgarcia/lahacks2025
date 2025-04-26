@@ -23,13 +23,26 @@ export default function ChatWindow() {
   const { mode, toggleTheme } = useTheme()
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  // Update the message interface to include potential code suggestions
   const [messages, setMessages] = useState<{
     role: string
     content: string
     timestamp: Date
     isCode?: boolean
     language?: string
-  }[]>([])
+    codeSuggestions?: Array<{
+      code: string
+      language: string
+      description?: string
+      fileId?: string
+    }>
+  }[]>([
+    {
+      role: "assistant",
+      content: "Hi there! I'm your coding assistant. How can I help you today?",
+      timestamp: new Date(),
+    },
+  ])
   const [codeFiles, setCodeFiles] = useState([
     {
       id: "file1",
@@ -175,8 +188,17 @@ export default function ChatWindow() {
           role: "assistant",
           content: data.result.text || "Sorry, I couldn't process that request.",
           timestamp: new Date(),
+          // Add code suggestions if they exist
+          ...(data.result.codeSuggestions && {
+            codeSuggestions: data.result.codeSuggestions
+          })
         },
       ]);
+
+      // If there are code suggestions, process the first one immediately
+      if (data.result.codeSuggestions && data.result.codeSuggestions.length > 0) {
+        processCodeSuggestion(data.result.codeSuggestions[0]);
+      }
     } catch (error) {
       console.error('Error:', error);
       setMessages((prev) => [
@@ -190,6 +212,100 @@ export default function ChatWindow() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Function to process code suggestions
+  const processCodeSuggestion = (suggestion: {
+    code: string;
+    language: string;
+    description?: string;
+  }) => {
+    // Try to find a suitable file based on language
+    let targetFileId = '';
+    
+    // Match file by language
+    const findFileByLanguage = codeFiles.find(file => {
+      const fileLanguage = file.language.toLowerCase();
+      const suggestionLanguage = suggestion.language.toLowerCase();
+      
+      return fileLanguage === suggestionLanguage || 
+        (fileLanguage === 'javascript' && suggestionLanguage === 'js') ||
+        (fileLanguage === 'typescript' && suggestionLanguage === 'ts') ||
+        (fileLanguage === 'jsx' && suggestionLanguage.includes('jsx')) ||
+        (fileLanguage === 'tsx' && suggestionLanguage.includes('tsx'));
+    });
+
+    if (findFileByLanguage) {
+      targetFileId = findFileByLanguage.id;
+    } else {
+      // If no matching file found, we'll use the active file in the current sandbox
+      const currentSandbox = sandboxes[activeSandbox];
+      targetFileId = currentSandbox.activeFile;
+    }
+
+    // Set up the code suggestion with the found file
+    const currentFile = codeFiles.find((file) => file.id === targetFileId);
+    
+    if (currentFile) {
+      setCodeSuggestion({
+        fileId: targetFileId,
+        originalCode: currentFile.content,
+        suggestedCode: suggestion.code,
+        language: suggestion.language,
+        message: suggestion.description,
+        isActive: true
+      });
+    } else {
+      // If we can't find a suitable file, create a new file
+      const fileExtension = getFileExtensionFromLanguage(suggestion.language);
+      const newFileName = `suggestion.${fileExtension}`;
+      const newFileId = `file${codeFiles.length + 1}`;
+      
+      // Add to files
+      setCodeFiles((prev) => [
+        ...prev,
+        {
+          id: newFileId,
+          name: newFileName,
+          language: suggestion.language,
+          content: '', // Empty original content since it's a new file
+        },
+      ]);
+
+      // Add to current sandbox
+      const updatedSandboxes = { ...sandboxes };
+      updatedSandboxes[activeSandbox].files.push(newFileId);
+      updatedSandboxes[activeSandbox].activeFile = newFileId;
+      setSandboxes(updatedSandboxes);
+      
+      // Set the suggestion for the new file
+      setCodeSuggestion({
+        fileId: newFileId,
+        originalCode: '',
+        suggestedCode: suggestion.code,
+        language: suggestion.language,
+        message: suggestion.description,
+        isActive: true
+      });
+    }
+  };
+
+  // Helper function to get file extension from language
+  const getFileExtensionFromLanguage = (language: string): string => {
+    const languageMap: Record<string, string> = {
+      'javascript': 'js',
+      'typescript': 'ts',
+      'jsx': 'jsx',
+      'tsx': 'tsx',
+      'python': 'py',
+      'ruby': 'rb',
+      'java': 'java',
+      'html': 'html',
+      'css': 'css',
+      'json': 'json',
+    };
+    
+    return languageMap[language.toLowerCase()] || 'js';
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -211,54 +327,54 @@ export default function ChatWindow() {
     }
   }
 
-  const executeCode = () => {
-    setIsExecuting(true)
-    setConsoleOutput("Executing code...\n")
+  // const executeCode = () => {
+  //   setIsExecuting(true)
+  //   setConsoleOutput("Executing code...\n")
 
-    // Get current file
-    const currentSandbox = sandboxes[activeSandbox]
-    const currentFileId = currentSandbox.activeFile
-    const currentFile = codeFiles.find((file) => file.id === currentFileId)
-    if (!currentFile) return
+  //   // Get current file
+  //   const currentSandbox = sandboxes[activeSandbox]
+  //   const currentFileId = currentSandbox.activeFile
+  //   const currentFile = codeFiles.find((file) => file.id === currentFileId)
+  //   if (!currentFile) return
 
-    // Simulate code execution
-    setTimeout(() => {
-      try {
-        let output = ""
+  //   // Simulate code execution
+  //   setTimeout(() => {
+  //     try {
+  //       let output = ""
 
-        if (currentFile.language === "javascript" || currentFile.language === "jsx") {
-          output = "✅ Code executed successfully!\n\n"
+  //       if (currentFile.language === "javascript" || currentFile.language === "jsx") {
+  //         output = "✅ Code executed successfully!\n\n"
 
-          if (currentFile.content.includes("console.log")) {
-            const logMatches = currentFile.content.match(/console\.log$$['"](.+?)['"]$$/g)
-            if (logMatches) {
-              logMatches.forEach((match) => {
-                const content = match.match(/console\.log$$['"](.+?)['"]$$/)?.[1] ?? ""
-                output += `> ${content}\n`
-              })
-            } else {
-              output += "> Hello, world!\n"
-            }
-          } else {
-            output += "> Function defined successfully\n"
-          }
+  //         if (currentFile.content.includes("console.log")) {
+  //           const logMatches = currentFile.content.match(/console\.log$$['"](.+?)['"]$$/g)
+  //           if (logMatches) {
+  //             logMatches.forEach((match) => {
+  //               const content = match.match(/console\.log$$['"](.+?)['"]$$/)?.[1] ?? ""
+  //               output += `> ${content}\n`
+  //             })
+  //           } else {
+  //             output += "> Hello, world!\n"
+  //           }
+  //         } else {
+  //           output += "> Function defined successfully\n"
+  //         }
 
-          if (currentFile.content.includes("Button")) {
-            output += "> Component rendered\n"
-          }
-        } else {
-          output = "✅ File processed successfully!\n"
-        }
+  //         if (currentFile.content.includes("Button")) {
+  //           output += "> Component rendered\n"
+  //         }
+  //       } else {
+  //         output = "✅ File processed successfully!\n"
+  //       }
 
-        setConsoleOutput((prev) => prev + output)
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
-        setConsoleOutput((prev) => prev + `❌ Error: ${errorMessage}\n`)
-      }
+  //       setConsoleOutput((prev) => prev + output)
+  //     } catch (error) {
+  //       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+  //       setConsoleOutput((prev) => prev + `❌ Error: ${errorMessage}\n`)
+  //     }
 
-      setIsExecuting(false)
-    }, 1500)
-  }
+  //     setIsExecuting(false)
+  //   }, 1500)
+  // }
 
   const addCodeToSandbox = (code: string, language: string) => {
     // Create a new file
@@ -402,6 +518,29 @@ export default function ChatWindow() {
       language: currentFile.language,
       isActive: true
     });
+  };
+
+  const handleInlineSuggestion = (suggestion: { fileId: string; originalCode: string; suggestedCode: string; language: string; message?: string }) => {
+    // Update the code in the sandbox
+    const fileIndex = codeFiles.findIndex((file) => file.id === suggestion.fileId);
+    if (fileIndex !== -1) {
+      const updatedFiles = [...codeFiles];
+      updatedFiles[fileIndex].content = suggestion.suggestedCode;
+      setCodeFiles(updatedFiles);
+    }
+
+    // Add a message to the chat indicating the suggestion was accepted
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content: `The code suggestion has been applied to ${codeFiles.find(f => f.id === suggestion.fileId)?.name || suggestion.fileId}.`,
+        timestamp: new Date(),
+      },
+    ]);
+    
+    // Clear the active suggestion
+    setCodeSuggestion(null);
   };
 
   const messagesStartRef = useRef<HTMLDivElement>(null)
@@ -827,7 +966,7 @@ export default function ChatWindow() {
           <Button
             variant="contained"
             size="small"
-            onClick={executeCode}
+            // onClick={executeCode}
             disabled={isExecuting}
             sx={{
               background: "linear-gradient(90deg, #FF9E2C 0%, #FF6B6B 100%)",
@@ -974,7 +1113,7 @@ export default function ChatWindow() {
         </Box>
 
         {/* Console output */}
-        <Box
+        {/* <Box
           sx={{
             height: "30%",
             overflow: "hidden",
@@ -1016,7 +1155,7 @@ export default function ChatWindow() {
           >
             {consoleOutput || "Run your code to see output here..."}
           </Box>
-        </Box>
+        </Box> */}
       </Box>
     </Box>
   )

@@ -1,4 +1,3 @@
-// filepath: /Users/andytgarcia/CodeProjects/PiCar/lahacks2025/web-app/src/app/api/users/route.ts
 import { GoogleGenAI } from "@google/genai";
 import { NextRequest } from "next/server";
 import { Octokit } from "@octokit/rest";
@@ -10,6 +9,18 @@ export interface PRFile {
   status: "added" | "removed" | "modified" | "renamed" | "copied" | "changed" | "unchanged";
   previousContent: string | null;
   newContent: string | null;
+}
+
+// Define the interface for our response structure that includes code suggestions
+export interface GeminiResponse {
+  text: string;
+  codeSuggestions?: CodeSuggestion[];
+}
+
+export interface CodeSuggestion {
+  code: string;
+  language: string;
+  description?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -53,14 +64,22 @@ export async function POST(request: NextRequest) {
     console.log("Gemini Response:", JSON.stringify(response, null, 2));
     
     // Extract the text from the response
-    const text = response.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
     
     if (!text) {
       console.error("No text in response:", response);
       return Response.json({ error: "No response from Gemini" }, { status: 500 });
     }
     
-    return Response.json({ result: { text } });
+    // Parse code blocks from the response
+    const codeSuggestions = extractCodeBlocks(text);
+    
+    const formattedResponse: GeminiResponse = { 
+      text,
+      ...(codeSuggestions.length > 0 && { codeSuggestions })
+    };
+    
+    return Response.json({ result: formattedResponse });
   } catch (error) {
     console.error("Detailed Error:", error);
     return Response.json({ 
@@ -68,6 +87,61 @@ export async function POST(request: NextRequest) {
       details: error instanceof Error ? error.stack : undefined
     }, { status: 500 });
   }
+}
+
+// Function to extract code blocks from markdown text
+function extractCodeBlocks(text: string): CodeSuggestion[] {
+  const codeBlockRegex = /```(\w+)?\n([\s\S]*?)\n```/g;
+  const codeSuggestions: CodeSuggestion[] = [];
+  let match;
+
+  while ((match = codeBlockRegex.exec(text)) !== null) {
+    const language = match[1]?.toLowerCase() || 'text';
+    const code = match[2].trim();
+    
+    // Skip empty code blocks
+    if (code) {
+      // Try to extract a description from the text before the code block
+      let description = '';
+      const textBeforeCodeBlock = text.substring(0, match.index).trim();
+      const lastParagraph = textBeforeCodeBlock.split('\n\n').pop();
+      if (lastParagraph && !lastParagraph.includes('```')) {
+        description = lastParagraph;
+      }
+      
+      codeSuggestions.push({
+        language: normalizeLanguage(language),
+        code,
+        description
+      });
+    }
+  }
+  
+  return codeSuggestions;
+}
+
+// Helper function to normalize language identifiers
+function normalizeLanguage(language: string): string {
+  const languageMap: Record<string, string> = {
+    'js': 'javascript',
+    'ts': 'typescript',
+    'jsx': 'jsx',
+    'tsx': 'tsx',
+    'py': 'python',
+    'rb': 'ruby',
+    'java': 'java',
+    'c': 'c',
+    'cpp': 'cpp',
+    'cs': 'csharp',
+    'html': 'html',
+    'css': 'css',
+    'json': 'json',
+    'md': 'markdown',
+    'yml': 'yaml',
+    'yaml': 'yaml',
+  };
+
+  return languageMap[language.toLowerCase()] || language.toLowerCase();
 }
 
 // Remove the automatic main() call as it causes issues with Next.js API routes
