@@ -12,7 +12,7 @@ export async function GET() {
     
     const response = await ai.models.generateContent({
       model: "gemini-2.0-flash",
-      contents: "Help me decide between UC San Diego and UC Riverside. I want to study computer science and I like the beach.",
+      contents: "Help me decide between UC San Diego and UC Riverside. I want to study computer science",
     });
     
     console.log(response); // This will show up in your terminal
