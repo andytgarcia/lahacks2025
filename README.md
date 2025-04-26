@@ -1,4 +1,4 @@
-# CodeMentor - AI-Powered Code Review and Learning Platform
+# CodeMentor - AI-Powered Pull Request Review and Learning Platform
 
 CodeMentor is an interactive platform that leverages Google Gemini's AI capabilities to provide intelligent code review, suggestions, and programming assistance. Built as a comprehensive solution for developers, it offers real-time feedback on code quality, formatting, logic, and performance.
 
