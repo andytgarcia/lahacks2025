@@ -75,7 +75,7 @@ async function main() {
     
 We found some issues that could be improved with this PR.
 
-[**View Detailed PR Analysis**](${chatUrl})`
+[View Detailed PR Analysis](${chatUrl})`
   } else {
     body = `## PR Review Results ✅
     
