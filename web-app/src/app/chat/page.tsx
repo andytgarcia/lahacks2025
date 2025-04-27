@@ -445,7 +445,7 @@ export default function ChatWindow() {
             borderColor: "divider",
           }}
         >
-          <Typography variant="h6">Gemini Chat</Typography>
+          <Typography variant="h6">Chat With Mr. Gemini !</Typography>
           <Box>
             <IconButton onClick={clearChatHistory} title="Clear chat history">
               <DeleteIcon />
