@@ -28,21 +28,23 @@ async function main() {
 
   const contents = [
     {
-      role: "system",
+      role: "user",
       parts: [
         {
-          text: default_system_instruction
+          text: `$default_system_instruction}
+          \n\n
+          If there is an error found for any of the error types, just tell me if there is an error. I don't care which which it is. Just return the structured data field hasErrors as true if there is an error.`
         },
       ],
     },
     {
-      role: "system",
+      role: "user",
       parts: [
         {
-          text: "If there is an error found for any of the error types, just tell me if there is an error. I don't care which which it is. Just return the structured data field hasErrors as true if there is an error."
-        }
-      ]
-    }
+          text: formattedPRCode
+        },
+      ],
+    },
   ];
 
   const response = await ai.models.generateContentStream({
@@ -58,19 +60,33 @@ async function main() {
     entireResponse += chunk.text;
   }
 
+  const hasErrors = JSON.parse(entireResponse).hasErrors;
+
   const octokit = getOctokit(process.env.GITHUB_TOKEN!);
   const { owner, repo } = context.repo;
   const pr = context.payload.pull_request!;
 
   const chatUrl = getChatWebUrl(owner, repo, pr.number);
 
-  console.log("Chat URL:", chatUrl);
+  let body = ''
+
+  if (hasErrors) {
+    body = `## PR Review Results 🔍
+    
+We found some issues that could be improved with this PR.
+
+[View Detailed PR Analysis](${chatUrl})`
+  } else {
+    body = `## PR Review Results ✅
+    
+No issues found! Your code looks great.`
+  }
 
   await octokit.rest.issues.createComment({
     owner,
     repo,
     issue_number: pr.number,
-    body: `🤖 ${entireResponse}`,
+    body: body,
   });
 }
 

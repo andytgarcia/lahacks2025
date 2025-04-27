@@ -1,7 +1,7 @@
 import { getOctokit } from "@actions/github";
 import { RestEndpointMethodTypes } from "@octokit/plugin-rest-endpoint-methods";
 
-const PROJECT_BASE_URL = "localhost:3000";
+const PROJECT_BASE_URL = "https://localhost:3000";
 
 export const getChatWebUrl = (owner: string, repo: string, pr: number) => {
   return `${PROJECT_BASE_URL}/chat?owner=${owner}&repo=${repo}&pr=${pr}`;
