@@ -5,6 +5,11 @@ import { Box, Paper, Typography, Button, Divider } from "@mui/material"
 import ContentCopyIcon from "@mui/icons-material/ContentCopy"
 import CheckIcon from "@mui/icons-material/Check"
 import PlayArrowIcon from "@mui/icons-material/PlayArrow"
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
+import {
+  vscDarkPlus,
+  prism,
+} from "react-syntax-highlighter/dist/esm/styles/prism"
 
 interface CodeSandboxProps {
   code: string
@@ -32,6 +37,21 @@ export default function CodeSandbox({ code, language, isDarkMode = false }: Code
       setIsRunning(false)
       setOutput("✅ Code executed successfully!\n\nOutput: Component rendered")
     }, 1500)
+  }
+
+  // Map common language names to Prism's supported languages
+  const getLanguageAlias = (lang: string): string => {
+    const aliases: Record<string, string> = {
+      js: "javascript",
+      jsx: "jsx",
+      ts: "typescript",
+      tsx: "tsx",
+      py: "python",
+      html: "html",
+      css: "css",
+      json: "json",
+    }
+    return aliases[lang.toLowerCase()] || lang.toLowerCase()
   }
 
   return (
@@ -142,13 +162,28 @@ export default function CodeSandbox({ code, language, isDarkMode = false }: Code
           padding: 2,
           background: isDarkMode ? "#1e1e1e" : "#282c34",
           overflowX: "auto",
-          fontFamily: "monospace",
-          fontSize: "0.875rem",
-          color: "#abb2bf",
           position: "relative",
         }}
       >
-        <pre style={{ margin: 0 }}>{code}</pre>
+        <SyntaxHighlighter
+          language={getLanguageAlias(language)}
+          style={isDarkMode ? vscDarkPlus : prism}
+          customStyle={{
+            margin: 0,
+            padding: 0,
+            background: "transparent",
+            fontSize: "0.875rem",
+          }}
+          showLineNumbers
+          lineNumberStyle={{
+            opacity: 0.5,
+            minWidth: "2em",
+            paddingRight: "1em",
+            textAlign: "right",
+          }}
+        >
+          {code}
+        </SyntaxHighlighter>
       </Box>
       {output && (
         <Box>
