@@ -78,3 +78,23 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
+
+
+  const { text, codeSuggestions } = response.data;
+  const hasErrors = response.data.hasErrors;
+
+  // Log the response
+  console.log("Response:", text);
+  console.log("Code Suggestions:", codeSuggestions);
+  console.log("Has Errors:", hasErrors);
+
+  // Send the response back to the client
+  return Response.json({ text, codeSuggestions, hasErrors });
+}
+//   } catch (error) {
+//     console.error("Error:", error);
+//     return Response.json({ error: "An error occurred while processing your request" }, { status: 500 });
+//   }
+// }
+//
+// function extractCodeBlocks(text: string): string[] {
