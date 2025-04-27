@@ -21,5 +21,7 @@ Check for logic errors in the following file of code. Generate constructive feed
 
 Performance Error Prompt
 Check for performance errors in the following file of code. Generate constructive feedback based on the guidelines given at the beginning. Be concise and summarize this in 5 sentences and provide the corrected code.
+
+When you look through the file of code provided, that will be the first and ONLY time you refer to that old code file. From that point on, 
 `
 

@@ -1,49 +1,59 @@
-"use client"
+"use client";
 
-import { useState, useRef, useEffect, useMemo, useCallback } from "react"
-import { Box, Paper, Typography, TextField, Button, Avatar, IconButton, Chip, CircularProgress} from "@mui/material"
-import SendIcon from "@mui/icons-material/Send"
-import CodeIcon from "@mui/icons-material/Code"
-import PlayArrowIcon from "@mui/icons-material/PlayArrow"
-import ContentCopyIcon from "@mui/icons-material/ContentCopy"
-import { AutoAwesome } from "@mui/icons-material"
-import AddIcon from "@mui/icons-material/Add"
-import LightModeIcon from "@mui/icons-material/LightMode"
-import DarkModeIcon from "@mui/icons-material/DarkMode"
-import DeleteIcon from "@mui/icons-material/Delete"
-import { useTheme } from "@/lib/theme-context"
-import CodeEditor from "@/app/components/ui/code-editor"
-import CodeDiffView from "@/app/components/ui/CodeDiffView"
-import CodeSandbox from "@/app/components/code-sandbox"
-import ReactMarkdown from 'react-markdown'
-import { useSearchParams } from "next/navigation"
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import {
+  Box,
+  Paper,
+  Typography,
+  TextField,
+  Button,
+  Avatar,
+  IconButton,
+  Chip,
+  CircularProgress,
+} from "@mui/material";
+import SendIcon from "@mui/icons-material/Send";
+import CodeIcon from "@mui/icons-material/Code";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import { AutoAwesome } from "@mui/icons-material";
+import AddIcon from "@mui/icons-material/Add";
+import LightModeIcon from "@mui/icons-material/LightMode";
+import DarkModeIcon from "@mui/icons-material/DarkMode";
+import DeleteIcon from "@mui/icons-material/Delete";
+import { useTheme } from "@/lib/theme-context";
+import CodeEditor from "@/app/components/ui/code-editor";
+import CodeDiffView from "@/app/components/ui/CodeDiffView";
+import CodeSandbox from "@/app/components/code-sandbox";
+import ReactMarkdown from "react-markdown";
+import { useSearchParams } from "next/navigation";
 
 type Message = {
-  role: string
-    content: string
-    timestamp: Date
-    isCode?: boolean
-    language?: string
-    codeSuggestions?: Array<{
-      code: string
-      language: string
-      description?: string
-      fileId?: string
-    }>
-}
+  role: string;
+  content: string;
+  timestamp: Date;
+  isCode?: boolean;
+  language?: string;
+  codeSuggestions?: Array<{
+    code: string;
+    language: string;
+    description?: string;
+    fileId?: string;
+  }>;
+};
 
 export default function ChatWindow() {
   // Update the message interface to include potential code suggestions
   const searchParams = useSearchParams();
-  
-  const repoName = useMemo(() => searchParams.get('repo'), [searchParams])
-  const prNumber = useMemo(() => searchParams.get('pr'), [searchParams])
-  const owner = useMemo(() => searchParams.get('owner'), [searchParams])
 
-  const { mode, toggleTheme } = useTheme()
-  const [input, setInput] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([])
+  const repoName = useMemo(() => searchParams.get("repo"), [searchParams]);
+  const prNumber = useMemo(() => searchParams.get("pr"), [searchParams]);
+  const owner = useMemo(() => searchParams.get("owner"), [searchParams]);
+
+  const { mode, toggleTheme } = useTheme();
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
 
   const [codeFiles, setCodeFiles] = useState([
     {
@@ -59,196 +69,203 @@ export default function ChatWindow() {
       content:
         "body {\n  font-family: sans-serif;\n  margin: 0;\n  padding: 20px;\n  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);\n}\n\n.container {\n  max-width: 1200px;\n  margin: 0 auto;\n  padding: 20px;\n  border-radius: 8px;\n  background-color: white;\n  box-shadow: 0 4px 6px rgba(0,0,0,0.1);\n}",
     },
-  ])
-  const [isExecuting, setIsExecuting] = useState(false)
-  const [activeSandbox, setActiveSandbox] = useState("sandbox1")
+  ]);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [activeSandbox, setActiveSandbox] = useState("sandbox1");
   const [sandboxes, setSandboxes] = useState<{
     [key: string]: {
-      name: string
-      files: string[]
-      activeFile: string
-    }
+      name: string;
+      files: string[];
+      activeFile: string;
+    };
   }>({
     sandbox1: {
       name: "Main Sandbox",
       files: ["file1", "file2"],
       activeFile: "file1",
     },
-  })
+  });
   // New state for code suggestions
   const [codeSuggestion, setCodeSuggestion] = useState<{
-    fileId: string
-    originalCode: string
-    suggestedCode: string
-    language: string
-    message?: string
-    isActive: boolean
-  } | null>(null)
+    fileId: string;
+    originalCode: string;
+    suggestedCode: string;
+    language: string;
+    message?: string;
+    isActive: boolean;
+  } | null>(null);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const localStorageKey = useMemo(() => `geminiChatMessages-${repoName}-${prNumber}-${owner}`, [
-    repoName,
-    prNumber,
-    owner
-  ]);
+  const localStorageKey = useMemo(
+    () => `geminiChatMessages-${repoName}-${prNumber}-${owner}`,
+    [repoName, prNumber, owner]
+  );
 
   // Function to process code suggestions
-  const processCodeSuggestion = useCallback((suggestion: {
-    code: string;
-    language: string;
-    description?: string;
-  }) => {
-    // Try to find a suitable file based on language
-    let targetFileId = '';
-    
-    // Match file by language
-    const findFileByLanguage = codeFiles.find(file => {
-      const fileLanguage = file.language.toLowerCase();
-      const suggestionLanguage = suggestion.language.toLowerCase();
-      
-      return fileLanguage === suggestionLanguage || 
-        (fileLanguage === 'javascript' && suggestionLanguage === 'js') ||
-        (fileLanguage === 'typescript' && suggestionLanguage === 'ts') ||
-        (fileLanguage === 'jsx' && suggestionLanguage.includes('jsx')) ||
-        (fileLanguage === 'tsx' && suggestionLanguage.includes('tsx'));
-    });
+  const processCodeSuggestion = useCallback(
+    (suggestion: { code: string; language: string; description?: string }) => {
+      // Try to find a suitable file based on language
+      let targetFileId = "";
 
-    if (findFileByLanguage) {
-      targetFileId = findFileByLanguage.id;
-    } else {
-      // If no matching file found, we'll use the active file in the current sandbox
-      const currentSandbox = sandboxes[activeSandbox];
-      targetFileId = currentSandbox.activeFile;
-    }
+      // Match file by language
+      const findFileByLanguage = codeFiles.find((file) => {
+        const fileLanguage = file.language.toLowerCase();
+        const suggestionLanguage = suggestion.language.toLowerCase();
 
-    // Set up the code suggestion with the found file
-    const currentFile = codeFiles.find((file) => file.id === targetFileId);
-    
-    if (currentFile) {
-      setCodeSuggestion({
-        fileId: targetFileId,
-        originalCode: currentFile.content,
-        suggestedCode: suggestion.code,
-        language: suggestion.language,
-        message: suggestion.description,
-        isActive: true
+        return (
+          fileLanguage === suggestionLanguage ||
+          (fileLanguage === "javascript" && suggestionLanguage === "js") ||
+          (fileLanguage === "typescript" && suggestionLanguage === "ts") ||
+          (fileLanguage === "jsx" && suggestionLanguage.includes("jsx")) ||
+          (fileLanguage === "tsx" && suggestionLanguage.includes("tsx"))
+        );
       });
-    } else {
-      // If we can't find a suitable file, create a new file
-      const fileExtension = getFileExtensionFromLanguage(suggestion.language);
-      const newFileName = `suggestion.${fileExtension}`;
-      const newFileId = `file${codeFiles.length + 1}`;
-      
-      // Add to files
-      setCodeFiles((prev) => [
-        ...prev,
-        {
-          id: newFileId,
-          name: newFileName,
+
+      if (findFileByLanguage) {
+        targetFileId = findFileByLanguage.id;
+      } else {
+        // If no matching file found, we'll use the active file in the current sandbox
+        const currentSandbox = sandboxes[activeSandbox];
+        targetFileId = currentSandbox.activeFile;
+      }
+
+      // Set up the code suggestion with the found file
+      const currentFile = codeFiles.find((file) => file.id === targetFileId);
+
+      if (currentFile) {
+        setCodeSuggestion({
+          fileId: targetFileId,
+          originalCode: currentFile.content,
+          suggestedCode: suggestion.code,
           language: suggestion.language,
-          content: '', // Empty original content since it's a new file
-        },
-      ]);
+          message: suggestion.description,
+          isActive: true,
+        });
+      } else {
+        // If we can't find a suitable file, create a new file
+        const fileExtension = getFileExtensionFromLanguage(suggestion.language);
+        const newFileName = `suggestion.${fileExtension}`;
+        const newFileId = `file${codeFiles.length + 1}`;
 
-      // Add to current sandbox
-      const updatedSandboxes = { ...sandboxes };
-      updatedSandboxes[activeSandbox].files.push(newFileId);
-      updatedSandboxes[activeSandbox].activeFile = newFileId;
-      setSandboxes(updatedSandboxes);
-      
-      // Set the suggestion for the new file
-      setCodeSuggestion({
-        fileId: newFileId,
-        originalCode: '',
-        suggestedCode: suggestion.code,
-        language: suggestion.language,
-        message: suggestion.description,
-        isActive: true
-      });
-    }
-  }, [codeFiles, sandboxes, activeSandbox]);
+        // Add to files
+        setCodeFiles((prev) => [
+          ...prev,
+          {
+            id: newFileId,
+            name: newFileName,
+            language: suggestion.language,
+            content: "", // Empty original content since it's a new file
+          },
+        ]);
 
-  const handleSendMessage = useCallback(async (dontSave?: boolean, message?: string) => {
-    if (!input.trim() && !message) return
+        // Add to current sandbox
+        const updatedSandboxes = { ...sandboxes };
+        updatedSandboxes[activeSandbox].files.push(newFileId);
+        updatedSandboxes[activeSandbox].activeFile = newFileId;
+        setSandboxes(updatedSandboxes);
 
-    // Add user message
-    const userMessage = {
-      role: "user",
-      content: message || input,
-      timestamp: new Date(),
-    };
-    if (!dontSave) {
-      setMessages((prev) => [...prev, userMessage]);
-    }
-    setInput("");
-    setIsLoading(true);
-
-    console.log(userMessage);
-
-    try {
-      // Format messages for the API
-      const formattedMessages = messages.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }));
-
-      const response = await fetch('/api/geminichat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          message: message || input,
-          messages: formattedMessages, // Include chat history
-          repo: repoName,
-          prNumber: prNumber,
-          owner: owner
-        }),
-      });
-
-      console.log("response", response)
-
-      if (!response.ok) {
-        throw new Error('Failed to get response from Gemini');
+        // Set the suggestion for the new file
+        setCodeSuggestion({
+          fileId: newFileId,
+          originalCode: "",
+          suggestedCode: suggestion.code,
+          language: suggestion.language,
+          message: suggestion.description,
+          isActive: true,
+        });
       }
+    },
+    [codeFiles, sandboxes, activeSandbox]
+  );
 
-      const data = await response.json();
+  const handleSendMessage = useCallback(
+    async (dontSave?: boolean, message?: string) => {
+      if (!input.trim() && !message) return;
 
-      console.log("data", data)
-      
-      // Add assistant's response to messages
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: data.result.text || "Sorry, I couldn't process that request.",
-          timestamp: new Date(),
-          // Add code suggestions if they exist
-          ...(data.result.codeSuggestions && {
-            codeSuggestions: data.result.codeSuggestions
-          })
-        },
-      ]);
-
-      // If there are code suggestions, process the first one immediately
-      if (data.result.codeSuggestions && data.result.codeSuggestions.length > 0) {
-        processCodeSuggestion(data.result.codeSuggestions[0]);
+      // Add user message
+      const userMessage = {
+        role: "user",
+        content: message || input,
+        timestamp: new Date(),
+      };
+      if (!dontSave) {
+        setMessages((prev) => [...prev, userMessage]);
       }
-    } catch (error) {
-      console.error('Error:', error);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "Sorry, there was an error processing your request.",
-          timestamp: new Date(),
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [messages, input, owner, prNumber, repoName, processCodeSuggestion]);
+      setInput("");
+      setIsLoading(true);
+
+      console.log(userMessage);
+
+      try {
+        // Format messages for the API
+        const formattedMessages = messages.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        }));
+
+        const response = await fetch("/api/geminichat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            message: message || input,
+            messages: formattedMessages, // Include chat history
+            repo: repoName,
+            prNumber: prNumber,
+            owner: owner,
+          }),
+        });
+
+        console.log("response", response);
+
+        if (!response.ok) {
+          throw new Error("Failed to get response from Gemini");
+        }
+
+        const data = await response.json();
+
+        console.log("data", data);
+
+        // Add assistant's response to messages
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              data.result.text || "Sorry, I couldn't process that request.",
+            timestamp: new Date(),
+            // Add code suggestions if they exist
+            ...(data.result.codeSuggestions && {
+              codeSuggestions: data.result.codeSuggestions,
+            }),
+          },
+        ]);
+
+        // If there are code suggestions, process the first one immediately
+        if (
+          data.result.codeSuggestions &&
+          data.result.codeSuggestions.length > 0
+        ) {
+          processCodeSuggestion(data.result.codeSuggestions[0]);
+        }
+      } catch (error) {
+        console.error("Error:", error);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "Sorry, there was an error processing your request.",
+            timestamp: new Date(),
+          },
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [messages, input, owner, prNumber, repoName, processCodeSuggestion]
+  );
 
   // Load messages from localStorage on component mount
   useEffect(() => {
@@ -259,91 +276,96 @@ export default function ChatWindow() {
         // Convert string timestamps back to Date objects
         const messagesWithDates = parsedMessages.map((msg: Message) => ({
           ...msg,
-          timestamp: new Date(msg.timestamp)
+          timestamp: new Date(msg.timestamp),
         }));
         setMessages(messagesWithDates);
       } catch (error) {
-        console.error('Error loading messages from localStorage:', error);
+        console.error("Error loading messages from localStorage:", error);
         // If there's an error, start with the default message
-        setMessages([{
-          role: "assistant",
-          content: "Hi there! I'm your coding assistant. How can I help you today?",
-          timestamp: new Date(),
-        }]);
+        setMessages([
+          {
+            role: "assistant",
+            content:
+              "Hi there! I'm your coding assistant. How can I help you today?",
+            timestamp: new Date(),
+          },
+        ]);
       }
     } else {
       if (!messages.length) {
-        console.log("No messages found, getting first message")
+        console.log("No messages found, getting first message");
         async function getFirstMessage() {
-          await handleSendMessage(true, "Please tell me how my code looks")
+          await handleSendMessage(true, "Please tell me how my code looks");
         }
-        getFirstMessage()
+        getFirstMessage();
       }
     }
   }, []);
 
   // Save messages to localStorage whenever they change
   useEffect(() => {
-    if (!messages.length) return
+    if (!messages.length) return;
     try {
       localStorage.setItem(localStorageKey, JSON.stringify(messages));
     } catch (error) {
-      console.error('Error saving messages to localStorage:', error);
+      console.error("Error saving messages to localStorage:", error);
     }
   }, [messages, localStorageKey]);
 
   // Add a function to clear chat history
   const clearChatHistory = () => {
-    setMessages([{
-      role: "assistant",
-      content: "Hi there! I'm your coding assistant. How can I help you today?",
-      timestamp: new Date(),
-    }]);
+    setMessages([
+      {
+        role: "assistant",
+        content:
+          "Hi there! I'm your coding assistant. How can I help you today?",
+        timestamp: new Date(),
+      },
+    ]);
     localStorage.removeItem(localStorageKey);
   };
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
-
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   // Helper function to get file extension from language
   const getFileExtensionFromLanguage = (language: string): string => {
     const languageMap: Record<string, string> = {
-      'javascript': 'js',
-      'typescript': 'ts',
-      'jsx': 'jsx',
-      'tsx': 'tsx',
-      'python': 'py',
-      'ruby': 'rb',
-      'java': 'java',
-      'html': 'html',
-      'css': 'css',
-      'json': 'json',
+      javascript: "js",
+      typescript: "ts",
+      jsx: "jsx",
+      tsx: "tsx",
+      python: "py",
+      ruby: "rb",
+      java: "java",
+      html: "html",
+      css: "css",
+      json: "json",
     };
-    
-    return languageMap[language.toLowerCase()] || 'js';
+
+    return languageMap[language.toLowerCase()] || "js";
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSendMessage()
+      e.preventDefault();
+      handleSendMessage();
     }
-  }
+  };
 
   const handleCodeChange = (value: string) => {
-    const currentSandbox = sandboxes[activeSandbox]
-    const currentFileId = currentSandbox.activeFile
-    const fileIndex = codeFiles.findIndex((file) => file.id === currentFileId)
+    const currentSandbox = sandboxes[activeSandbox];
+    const currentFileId = currentSandbox.activeFile;
+    const fileIndex = codeFiles.findIndex((file) => file.id === currentFileId);
 
     if (fileIndex !== -1) {
-      const updatedFiles = [...codeFiles]
-      updatedFiles[fileIndex].content = value
-      setCodeFiles(updatedFiles)
+      const updatedFiles = [...codeFiles];
+      updatedFiles[fileIndex].content = value;
+      setCodeFiles(updatedFiles);
     }
-  }
+  };
 
   // const executeCode = () => {
   //   setIsExecuting(true)
@@ -396,15 +418,15 @@ export default function ChatWindow() {
 
   const addCodeToSandbox = (code: string, language: string) => {
     // Create a new file
-    const newFileId = `file${codeFiles.length + 1}`
+    const newFileId = `file${codeFiles.length + 1}`;
     const fileName =
       language === "jsx"
         ? "Component.jsx"
         : language === "javascript"
-          ? "script.js"
-          : language === "css"
-            ? "styles.css"
-            : "file.txt"
+        ? "script.js"
+        : language === "css"
+        ? "styles.css"
+        : "file.txt";
 
     // Add to files
     setCodeFiles((prev) => [
@@ -415,18 +437,18 @@ export default function ChatWindow() {
         language,
         content: code,
       },
-    ])
+    ]);
 
     // Add to current sandbox
-    const updatedSandboxes = { ...sandboxes }
-    updatedSandboxes[activeSandbox].files.push(newFileId)
-    updatedSandboxes[activeSandbox].activeFile = newFileId
-    setSandboxes(updatedSandboxes)
-  }
+    const updatedSandboxes = { ...sandboxes };
+    updatedSandboxes[activeSandbox].files.push(newFileId);
+    updatedSandboxes[activeSandbox].activeFile = newFileId;
+    setSandboxes(updatedSandboxes);
+  };
 
   const createNewSandbox = () => {
-    const newSandboxId = `sandbox${Object.keys(sandboxes).length + 1}`
-    const newFileId = `file${codeFiles.length + 1}`
+    const newSandboxId = `sandbox${Object.keys(sandboxes).length + 1}`;
+    const newFileId = `file${codeFiles.length + 1}`;
 
     // Create a new file
     setCodeFiles((prev) => [
@@ -437,7 +459,7 @@ export default function ChatWindow() {
         language: "javascript",
         content: "// New sandbox\nconsole.log('Hello from new sandbox!');",
       },
-    ])
+    ]);
 
     // Create new sandbox
     setSandboxes((prev) => ({
@@ -447,47 +469,56 @@ export default function ChatWindow() {
         files: [newFileId],
         activeFile: newFileId,
       },
-    }))
+    }));
 
-    setActiveSandbox(newSandboxId)
-  }
+    setActiveSandbox(newSandboxId);
+  };
 
   // Get current file content
   const getCurrentFileContent = () => {
-    const currentSandbox = sandboxes[activeSandbox]
-    if (!currentSandbox) return ""
+    const currentSandbox = sandboxes[activeSandbox];
+    if (!currentSandbox) return "";
 
-    const currentFileId = currentSandbox.activeFile
-    const currentFile = codeFiles.find((file) => file.id === currentFileId)
-    return currentFile ? currentFile.content : ""
-  }
+    const currentFileId = currentSandbox.activeFile;
+    const currentFile = codeFiles.find((file) => file.id === currentFileId);
+    return currentFile ? currentFile.content : "";
+  };
 
   // Get current file language
   const getCurrentFileLanguage = () => {
-    const currentSandbox = sandboxes[activeSandbox]
-    if (!currentSandbox) return "javascript"
+    const currentSandbox = sandboxes[activeSandbox];
+    if (!currentSandbox) return "javascript";
 
-    const currentFileId = currentSandbox.activeFile
-    const currentFile = codeFiles.find((file) => file.id === currentFileId)
-    return currentFile ? currentFile.language : "javascript"
-  }
+    const currentFileId = currentSandbox.activeFile;
+    const currentFile = codeFiles.find((file) => file.id === currentFileId);
+    return currentFile ? currentFile.language : "javascript";
+  };
 
   // Get files for current sandbox
   const getCurrentSandboxFiles = () => {
-    const currentSandbox = sandboxes[activeSandbox]
-    if (!currentSandbox) return []
+    const currentSandbox = sandboxes[activeSandbox];
+    if (!currentSandbox) return [];
     return currentSandbox.files
       .map((fileId) => codeFiles.find((file) => file.id === fileId))
-      .filter((file): file is { id: string; name: string; language: string; content: string } => file !== undefined)
-  }
+      .filter(
+        (
+          file
+        ): file is {
+          id: string;
+          name: string;
+          language: string;
+          content: string;
+        } => file !== undefined
+      );
+  };
 
   const getCodeHeaderGradient = () => {
     return mode === "light"
       ? "linear-gradient(90deg, #6B66FF 0%, #9370DB 100%)"
-      : "linear-gradient(90deg, #5550E3 0%, #7952D1 100%)"
-  }
+      : "linear-gradient(90deg, #5550E3 0%, #7952D1 100%)";
+  };
 
-/* CHANGE */
+  /* CHANGE */
 
   // Function to demonstrate code suggestion feature
   const generateSampleSuggestion = () => {
@@ -495,23 +526,27 @@ export default function ChatWindow() {
     const currentSandbox = sandboxes[activeSandbox];
     const currentFileId = currentSandbox.activeFile;
     const currentFile = codeFiles.find((file) => file.id === currentFileId);
-    
+
     if (!currentFile) return;
-    
+
     // Create a sample suggestion
     let suggestedCode = currentFile.content;
-    
+
     // Make different suggestions based on file type
-    if (currentFile.language === "javascript" || currentFile.language === "jsx") {
+    if (
+      currentFile.language === "javascript" ||
+      currentFile.language === "jsx"
+    ) {
       // Suggest adding comments and improving variable names
       if (suggestedCode.includes("console.log")) {
         suggestedCode = suggestedCode.replace(
-          /console\.log\((.*)\)/g, 
+          /console\.log\((.*)\)/g,
           "// Output the result to console\nconsole.log($1) // Consider using more descriptive logging"
         );
       } else {
         // Add a sample function with good practices
-        suggestedCode += "\n\n/**\n * Calculate sum of two numbers\n * @param {number} a - First number\n * @param {number} b - Second number\n * @returns {number} Sum of a and b\n */\nfunction calculateSum(a, b) {\n  return a + b;\n}\n";
+        suggestedCode +=
+          "\n\n/**\n * Calculate sum of two numbers\n * @param {number} a - First number\n * @param {number} b - Second number\n * @returns {number} Sum of a and b\n */\nfunction calculateSum(a, b) {\n  return a + b;\n}\n";
       }
     } else if (currentFile.language === "css") {
       // Suggest using variables and better practices
@@ -520,20 +555,28 @@ export default function ChatWindow() {
         "/* Use CSS variables for consistent theming */\n--primary-gradient: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);\nbackground: var(--primary-gradient);"
       );
     }
-    
+
     // Set the suggestion
     setCodeSuggestion({
       fileId: currentFileId,
       originalCode: currentFile.content,
       suggestedCode: suggestedCode,
       language: currentFile.language,
-      isActive: true
+      isActive: true,
     });
   };
 
-  const handleInlineSuggestion = (suggestion: { fileId: string; originalCode: string; suggestedCode: string; language: string; message?: string }) => {
+  const handleInlineSuggestion = (suggestion: {
+    fileId: string;
+    originalCode: string;
+    suggestedCode: string;
+    language: string;
+    message?: string;
+  }) => {
     // Update the code in the sandbox
-    const fileIndex = codeFiles.findIndex((file) => file.id === suggestion.fileId);
+    const fileIndex = codeFiles.findIndex(
+      (file) => file.id === suggestion.fileId
+    );
     if (fileIndex !== -1) {
       const updatedFiles = [...codeFiles];
       updatedFiles[fileIndex].content = suggestion.suggestedCode;
@@ -545,21 +588,24 @@ export default function ChatWindow() {
       ...prev,
       {
         role: "assistant",
-        content: `The code suggestion has been applied to ${codeFiles.find(f => f.id === suggestion.fileId)?.name || suggestion.fileId}.`,
+        content: `The code suggestion has been applied to ${
+          codeFiles.find((f) => f.id === suggestion.fileId)?.name ||
+          suggestion.fileId
+        }.`,
         timestamp: new Date(),
       },
     ]);
-    
+
     // Clear the active suggestion
     setCodeSuggestion(null);
   };
 
-  const messagesStartRef = useRef<HTMLDivElement>(null)
+  const messagesStartRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to top when new messages arrive
   useEffect(() => {
-    messagesStartRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+    messagesStartRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   return (
     <Box
@@ -582,7 +628,8 @@ export default function ChatWindow() {
           display: "flex",
           flexDirection: "column",
           borderRight: 1,
-          borderColor: mode === "light" ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.1)",
+          borderColor:
+            mode === "light" ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.1)",
         }}
       >
         <Box
@@ -623,7 +670,8 @@ export default function ChatWindow() {
               key={index}
               sx={{
                 display: "flex",
-                justifyContent: message.role === "user" ? "flex-end" : "flex-start",
+                justifyContent:
+                  message.role === "user" ? "flex-end" : "flex-start",
                 marginBottom: 1,
                 opacity: 1,
                 animation: "fadeIn 0.5s ease-in-out",
@@ -638,26 +686,32 @@ export default function ChatWindow() {
                 elevation={3}
                 sx={{
                   maxWidth: "85%",
-                  padding: 2,
-                  borderRadius: message.role === "user" ? "20px 20px 5px 20px" : "20px 20px 20px 5px",
+                  padding: 3,
+                  borderRadius:
+                    message.role === "user"
+                      ? "18px 18px 6px 18px"
+                      : "18px 18px 18px 6px",
                   background:
                     message.role === "user"
-                      ? "linear-gradient(135deg, #9370DB 0%, #FF6B6B 100%)"
+                      ? "linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%)"
                       : mode === "light"
-                        ? "#ffffff"
-                        : "#2a2a2a",
+                      ? "linear-gradient(135deg, #ffffff 0%, #f7f7f7 100%)"
+                      : "linear-gradient(135deg, #2e2e2e 0%, #1f1f1f 100%)",
                   color: message.role === "user" ? "white" : "inherit",
                   position: "relative",
+                  boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+                  transition: "all 0.3s ease",
                   "&::before":
                     message.role === "user"
                       ? {
                           content: '""',
                           position: "absolute",
                           bottom: 0,
-                          right: "-10px",
-                          width: "20px",
-                          height: "20px",
-                          background: "linear-gradient(135deg, transparent 50%, #FF6B6B 50%)",
+                          right: "-8px",
+                          width: "18px",
+                          height: "18px",
+                          background:
+                            "linear-gradient(135deg, transparent 50%, #4A00E0 50%)",
                           transform: "rotate(45deg)",
                           borderRadius: "0 0 5px 0",
                         }
@@ -668,13 +722,13 @@ export default function ChatWindow() {
                           content: '""',
                           position: "absolute",
                           bottom: 0,
-                          left: "-10px",
-                          width: "20px",
-                          height: "20px",
+                          left: "-8px",
+                          width: "18px",
+                          height: "18px",
                           background:
                             mode === "light"
                               ? "linear-gradient(135deg, #ffffff 50%, transparent 50%)"
-                              : "linear-gradient(135deg, #2a2a2a 50%, transparent 50%)",
+                              : "linear-gradient(135deg, #1f1f1f 50%, transparent 50%)",
                           transform: "rotate(45deg)",
                           borderRadius: "0 0 0 5px",
                         }
@@ -682,19 +736,33 @@ export default function ChatWindow() {
                 }}
               >
                 {message.role === "assistant" && (
-                  <Box sx={{ display: "flex", alignItems: "center", marginBottom: 1, gap: 1 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      mb: 2,
+                      gap: 1,
+                    }}
+                  >
                     <Avatar
                       sx={{
-                        width: 32,
-                        height: 32,
-                        background: "linear-gradient(135deg, #FF6B6B 0%, #9370DB 50%, #FF9E2C 100%)",
-                        fontSize: "0.875rem",
+                        width: 36,
+                        height: 36,
+                        background:
+                          "linear-gradient(135deg, #FF6B6B 0%, #9370DB 50%, #FF9E2C 100%)",
+                        fontSize: "0.9rem",
                         fontWeight: "bold",
                       }}
                     >
                       G
                     </Avatar>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                    <Typography
+                      variant="subtitle2"
+                      sx={{
+                        fontWeight: 700,
+                        color: mode === "light" ? "#555" : "#ddd",
+                      }}
+                    >
                       Google Gemini
                     </Typography>
                   </Box>
@@ -702,53 +770,75 @@ export default function ChatWindow() {
 
                 {message.isCode && message.language ? (
                   <Box sx={{ position: "relative" }}>
-                    <CodeSandbox code={message.content} language={message.language} isDarkMode={mode === "dark"} />
+                    <CodeSandbox
+                      code={message.content}
+                      language={message.language}
+                      isDarkMode={mode === "dark"}
+                    />
                     <Button
                       size="small"
                       variant="contained"
-                      onClick={() => addCodeToSandbox(message.content, message.language || "javascript")}
+                      onClick={() =>
+                        addCodeToSandbox(
+                          message.content,
+                          message.language || "javascript"
+                        )
+                      }
                       sx={{
                         position: "absolute",
-                        bottom: 8,
-                        right: 8,
-                        background: "linear-gradient(90deg, #FF6B6B 0%, #9370DB 100%)",
-                        fontSize: "0.75rem",
+                        bottom: 12,
+                        right: 12,
+                        background:
+                          "linear-gradient(90deg, #FF6B6B 0%, #9370DB 100%)",
+                        fontSize: "0.7rem",
                         py: 0.5,
+                        borderRadius: 2,
+                        textTransform: "none",
+                        "&:hover": {
+                          background:
+                            "linear-gradient(90deg, #FF6B6B 20%, #9370DB 80%)",
+                        },
                       }}
                     >
                       Try in Sandbox
                     </Button>
                   </Box>
                 ) : (
-                  <Box sx={{ 
-                    '& pre': { 
-                      backgroundColor: mode === 'light' ? '#f5f5f5' : '#2a2a2a',
-                      padding: '1rem',
-                      borderRadius: '4px',
-                      overflowX: 'auto'
-                    },
-                    '& code': {
-                      fontFamily: 'monospace',
-                      fontSize: '0.9em'
-                    },
-                    '& p': {
-                      margin: '0.5em 0'
-                    },
-                    '& ul, & ol': {
-                      paddingLeft: '1.5em',
-                      margin: '0.5em 0'
-                    },
-                    '& h1, & h2, & h3, & h4, & h5, & h6': {
-                      margin: '1em 0 0.5em 0',
-                      fontWeight: 600
-                    },
-                    '& blockquote': {
-                      borderLeft: '4px solid #9370DB',
-                      paddingLeft: '1em',
-                      margin: '1em 0',
-                      color: mode === 'light' ? '#666' : '#aaa'
-                    }
-                  }}>
+                  <Box
+                    sx={{
+                      "& pre": {
+                        backgroundColor:
+                          mode === "light" ? "#f0f0f5" : "#242424",
+                        padding: "1rem",
+                        borderRadius: "8px",
+                        overflowX: "auto",
+                        fontSize: "0.95rem",
+                      },
+                      "& code": {
+                        fontFamily: "Fira Code, monospace",
+                        fontSize: "0.9rem",
+                      },
+                      "& p": {
+                        margin: "0.75em 0",
+                        lineHeight: 1.6,
+                      },
+                      "& ul, & ol": {
+                        paddingLeft: "1.5em",
+                        margin: "0.75em 0",
+                      },
+                      "& h1, & h2, & h3, & h4, & h5, & h6": {
+                        margin: "1.25em 0 0.75em 0",
+                        fontWeight: 700,
+                      },
+                      "& blockquote": {
+                        borderLeft: "4px solid #9370DB",
+                        paddingLeft: "1em",
+                        margin: "1em 0",
+                        color: mode === "light" ? "#555" : "#aaa",
+                        fontStyle: "italic",
+                      },
+                    }}
+                  >
                     <ReactMarkdown>{message.content}</ReactMarkdown>
                   </Box>
                 )}
@@ -758,9 +848,15 @@ export default function ChatWindow() {
                   sx={{
                     display: "block",
                     textAlign: "right",
-                    marginTop: 1,
+                    marginTop: 2,
                     opacity: 0.7,
-                    color: message.role === "user" ? "rgba(255,255,255,0.9)" : "inherit",
+                    color:
+                      message.role === "user"
+                        ? "rgba(255,255,255,0.85)"
+                        : mode === "light"
+                        ? "#999"
+                        : "#aaa",
+                    fontSize: "0.75rem",
                   }}
                 >
                   {message.timestamp.toLocaleTimeString([], {
@@ -771,7 +867,7 @@ export default function ChatWindow() {
               </Paper>
             </Box>
           ))}
-          
+
           {/* Loading indicator */}
           {isLoading && (
             <Box
@@ -793,13 +889,16 @@ export default function ChatWindow() {
                 }}
               >
                 <CircularProgress size={20} sx={{ color: "#9370DB" }} />
-                <Typography variant="body2" sx={{ color: mode === "light" ? "#666" : "#aaa" }}>
+                <Typography
+                  variant="body2"
+                  sx={{ color: mode === "light" ? "#666" : "#aaa" }}
+                >
                   Thinking...
                 </Typography>
               </Paper>
             </Box>
           )}
-          
+
           <div ref={messagesEndRef} />
         </Box>
 
@@ -808,7 +907,8 @@ export default function ChatWindow() {
           sx={{
             padding: 2,
             borderTop: "1px solid",
-            borderColor: mode === "light" ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.1)",
+            borderColor:
+              mode === "light" ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.1)",
             background: mode === "light" ? "white" : "#2a2a2a",
           }}
         >
@@ -831,7 +931,11 @@ export default function ChatWindow() {
                     borderColor: "#9370DB",
                   },
                   "&.Mui-focused": {
-                    boxShadow: `0 0 0 2px ${mode === "light" ? "rgba(147,112,219,0.3)" : "rgba(147,112,219,0.5)"}`,
+                    boxShadow: `0 0 0 2px ${
+                      mode === "light"
+                        ? "rgba(147,112,219,0.3)"
+                        : "rgba(147,112,219,0.5)"
+                    }`,
                   },
                 },
               }}
@@ -840,7 +944,7 @@ export default function ChatWindow() {
                   <IconButton
                     size="small"
                     onClick={() => {
-                      setInput((prev) => prev + "\n```js\n\n```")
+                      setInput((prev) => prev + "\n```js\n\n```");
                     }}
                     sx={{ color: "text.secondary" }}
                   >
@@ -859,7 +963,8 @@ export default function ChatWindow() {
                 boxShadow: "0 4px 10px rgba(147,112,219,0.3)",
                 transition: "all 0.3s",
                 "&:hover": {
-                  background: "linear-gradient(90deg, #FF5151 0%, #8A60D0 100%)",
+                  background:
+                    "linear-gradient(90deg, #FF5151 0%, #8A60D0 100%)",
                   transform: "translateY(-2px)",
                   boxShadow: "0 6px 15px rgba(147,112,219,0.4)",
                 },
@@ -902,7 +1007,10 @@ export default function ChatWindow() {
                 label={sandbox.name}
                 onClick={() => setActiveSandbox(id)}
                 sx={{
-                  backgroundColor: activeSandbox === id ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
+                  backgroundColor:
+                    activeSandbox === id
+                      ? "rgba(255,255,255,0.2)"
+                      : "rgba(255,255,255,0.1)",
                   color: "white",
                   fontWeight: activeSandbox === id ? 600 : 400,
                   borderRadius: "16px",
@@ -937,9 +1045,10 @@ export default function ChatWindow() {
             display: "flex",
             justifyContent: "flex-end",
             padding: "8px 24px",
-            background: mode === "light"
-              ? "linear-gradient(90deg, rgba(107,102,255,0.05) 0%, rgba(147,112,219,0.05) 100%)"
-              : "linear-gradient(90deg, rgba(107,102,255,0.1) 0%, rgba(147,112,219,0.1) 100%)",
+            background:
+              mode === "light"
+                ? "linear-gradient(90deg, rgba(107,102,255,0.05) 0%, rgba(147,112,219,0.05) 100%)"
+                : "linear-gradient(90deg, rgba(107,102,255,0.1) 0%, rgba(147,112,219,0.1) 100%)",
             gap: 1,
           }}
         >
@@ -947,13 +1056,19 @@ export default function ChatWindow() {
             variant="contained"
             size="small"
             onClick={() => {
-              navigator.clipboard.writeText(getCurrentFileContent())
+              navigator.clipboard.writeText(getCurrentFileContent());
             }}
             sx={{
-              background: mode === "light" ? "rgba(255,255,255,0.8)" : "rgba(50,50,50,0.8)",
+              background:
+                mode === "light"
+                  ? "rgba(255,255,255,0.8)"
+                  : "rgba(50,50,50,0.8)",
               color: mode === "light" ? "text.secondary" : "#e0e0e0",
               "&:hover": {
-                background: mode === "light" ? "rgba(255,255,255,0.95)" : "rgba(60,60,60,0.95)",
+                background:
+                  mode === "light"
+                    ? "rgba(255,255,255,0.95)"
+                    : "rgba(60,60,60,0.95)",
               },
             }}
             startIcon={<ContentCopyIcon />}
@@ -972,7 +1087,7 @@ export default function ChatWindow() {
               },
             }}
           >
-            <AutoAwesome/>
+            <AutoAwesome />
           </Button>
           <Button
             variant="contained"
@@ -996,7 +1111,8 @@ export default function ChatWindow() {
         <Box
           sx={{
             borderBottom: "1px solid",
-            borderColor: mode === "light" ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.1)",
+            borderColor:
+              mode === "light" ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.1)",
             background:
               mode === "light"
                 ? "linear-gradient(90deg, rgba(107,102,255,0.05) 0%, rgba(147,112,219,0.05) 100%)"
@@ -1004,7 +1120,14 @@ export default function ChatWindow() {
             padding: "8px 16px",
           }}
         >
-          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
+          <Box
+            sx={{
+              display: "flex",
+              gap: 1,
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
             {getCurrentSandboxFiles().map((file) => (
               <Chip
                 key={file.id}
@@ -1016,21 +1139,22 @@ export default function ChatWindow() {
                       height: 8,
                       borderRadius: "50%",
                       backgroundColor:
-                        file.language === "javascript" || file.language === "jsx"
+                        file.language === "javascript" ||
+                        file.language === "jsx"
                           ? "#F7DF1E"
                           : file.language === "css"
-                            ? "#2965F1"
-                            : file.language === "html"
-                              ? "#E34F26"
-                              : "#9370DB",
+                          ? "#2965F1"
+                          : file.language === "html"
+                          ? "#E34F26"
+                          : "#9370DB",
                       display: "inline-block",
                     }}
                   />
                 }
                 onClick={() => {
-                  const updatedSandboxes = { ...sandboxes }
-                  updatedSandboxes[activeSandbox].activeFile = file.id
-                  setSandboxes(updatedSandboxes)
+                  const updatedSandboxes = { ...sandboxes };
+                  updatedSandboxes[activeSandbox].activeFile = file.id;
+                  setSandboxes(updatedSandboxes);
                 }}
                 sx={{
                   backgroundColor:
@@ -1046,7 +1170,10 @@ export default function ChatWindow() {
                   transition: "all 0.2s",
                   color: mode === "light" ? "inherit" : "#e0e0e0",
                   "&:hover": {
-                    backgroundColor: mode === "light" ? "rgba(107,102,255,0.05)" : "rgba(107,102,255,0.15)",
+                    backgroundColor:
+                      mode === "light"
+                        ? "rgba(107,102,255,0.05)"
+                        : "rgba(107,102,255,0.15)",
                   },
                 }}
               />
@@ -1054,7 +1181,7 @@ export default function ChatWindow() {
             <IconButton
               size="small"
               onClick={() => {
-                const newFileId = `file${codeFiles.length + 1}`
+                const newFileId = `file${codeFiles.length + 1}`;
                 setCodeFiles((prev) => [
                   ...prev,
                   {
@@ -1063,19 +1190,22 @@ export default function ChatWindow() {
                     language: "javascript",
                     content: "// New file\n",
                   },
-                ])
+                ]);
 
-                const updatedSandboxes = { ...sandboxes }
-                updatedSandboxes[activeSandbox].files.push(newFileId)
-                updatedSandboxes[activeSandbox].activeFile = newFileId
-                setSandboxes(updatedSandboxes)
+                const updatedSandboxes = { ...sandboxes };
+                updatedSandboxes[activeSandbox].files.push(newFileId);
+                updatedSandboxes[activeSandbox].activeFile = newFileId;
+                setSandboxes(updatedSandboxes);
               }}
               sx={{
                 color: "text.secondary",
                 width: 24,
                 height: 24,
                 "&:hover": {
-                  backgroundColor: mode === "light" ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)",
+                  backgroundColor:
+                    mode === "light"
+                      ? "rgba(0,0,0,0.05)"
+                      : "rgba(255,255,255,0.05)",
                 },
               }}
             >
@@ -1087,33 +1217,39 @@ export default function ChatWindow() {
         {/* Code editor */}
         <Box sx={{ flexGrow: 1, overflow: "hidden", position: "relative" }}>
           {/* Show code suggestion if available */}
-          {codeSuggestion && codeSuggestion.isActive && codeSuggestion.fileId === sandboxes[activeSandbox]?.activeFile && (
-            <CodeDiffView 
-              originalCode={codeSuggestion.originalCode}
-              suggestedCode={codeSuggestion.suggestedCode}
-              language={codeSuggestion.language}
-              message={codeSuggestion.message}
-              isDarkMode={mode === "dark"}
-              onAccept={() => {
-                // Update current file content with the suggested code
-                const fileIndex = codeFiles.findIndex((file) => file.id === codeSuggestion.fileId);
-                if (fileIndex !== -1) {
-                  const updatedFiles = [...codeFiles];
-                  updatedFiles[fileIndex].content = codeSuggestion.suggestedCode;
-                  setCodeFiles(updatedFiles);
-                }
-                // Clear the suggestion
-                setCodeSuggestion(null);
-              }}
-              onReject={() => {
-                // Just dismiss the suggestion
-                setCodeSuggestion(null);
-              }}
-            />
-          )}
+          {codeSuggestion &&
+            codeSuggestion.isActive &&
+            codeSuggestion.fileId === sandboxes[activeSandbox]?.activeFile && (
+              <CodeDiffView
+                originalCode={codeSuggestion.originalCode}
+                suggestedCode={codeSuggestion.suggestedCode}
+                language={codeSuggestion.language}
+                message={codeSuggestion.message}
+                isDarkMode={mode === "dark"}
+                onAccept={() => {
+                  // Update current file content with the suggested code
+                  const fileIndex = codeFiles.findIndex(
+                    (file) => file.id === codeSuggestion.fileId
+                  );
+                  if (fileIndex !== -1) {
+                    const updatedFiles = [...codeFiles];
+                    updatedFiles[fileIndex].content =
+                      codeSuggestion.suggestedCode;
+                    setCodeFiles(updatedFiles);
+                  }
+                  // Clear the suggestion
+                  setCodeSuggestion(null);
+                }}
+                onReject={() => {
+                  // Just dismiss the suggestion
+                  setCodeSuggestion(null);
+                }}
+              />
+            )}
 
           {/* Only show the editor when there's no active suggestion or if we're viewing a different file */}
-          {!codeSuggestion?.isActive || codeSuggestion.fileId !== sandboxes[activeSandbox]?.activeFile ? (
+          {!codeSuggestion?.isActive ||
+          codeSuggestion.fileId !== sandboxes[activeSandbox]?.activeFile ? (
             <CodeEditor
               value={getCurrentFileContent()}
               language={getCurrentFileLanguage()}
@@ -1169,5 +1305,5 @@ export default function ChatWindow() {
         </Box> */}
       </Box>
     </Box>
-  )
+  );
 }
