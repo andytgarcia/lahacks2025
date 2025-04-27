@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useMemo } from "react"
+import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { Box, Paper, Typography, TextField, Button, Avatar, IconButton, Chip, CircularProgress} from "@mui/material"
 import SendIcon from "@mui/icons-material/Send"
 import CodeIcon from "@mui/icons-material/Code"
@@ -93,136 +93,8 @@ export default function ChatWindow() {
     owner
   ]);
 
-  // Load messages from localStorage on component mount
-  useEffect(() => {
-    const savedMessages = localStorage.getItem(localStorageKey);
-    if (savedMessages) {
-      try {
-        const parsedMessages = JSON.parse(savedMessages);
-        // Convert string timestamps back to Date objects
-        const messagesWithDates = parsedMessages.map((msg: Message) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp)
-        }));
-        setMessages(messagesWithDates);
-      } catch (error) {
-        console.error('Error loading messages from localStorage:', error);
-        // If there's an error, start with the default message
-        setMessages([{
-          role: "assistant",
-          content: "Hi there! I'm your coding assistant. How can I help you today?",
-          timestamp: new Date(),
-        }]);
-      }
-    } else {
-      // If no saved messages, start with the default message
-      setMessages([{
-        role: "assistant",
-        content: "Hi there! I'm your coding assistant. How can I help you today?",
-        timestamp: new Date(),
-      }]);
-    }
-  }, []);
-
-  // Save messages to localStorage whenever they change
-  useEffect(() => {
-    try {
-      localStorage.setItem(localStorageKey, JSON.stringify(messages));
-    } catch (error) {
-      console.error('Error saving messages to localStorage:', error);
-    }
-  }, [messages, localStorageKey]);
-
-  // Add a function to clear chat history
-  const clearChatHistory = () => {
-    setMessages([{
-      role: "assistant",
-      content: "Hi there! I'm your coding assistant. How can I help you today?",
-      timestamp: new Date(),
-    }]);
-    localStorage.removeItem(localStorageKey);
-  };
-
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
-
-  const handleSendMessage = async () => {
-    if (!input.trim()) return
-
-    // Add user message
-    const userMessage = {
-      role: "user",
-      content: input,
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    setIsLoading(true);
-
-    try {
-      // Format messages for the API
-      const formattedMessages = messages.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }));
-
-      const response = await fetch('/api/geminichat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          message: input,
-          messages: formattedMessages, // Include chat history
-          repo: repoName,
-          prNumber: prNumber,
-          owner: owner
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get response from Gemini');
-      }
-
-      const data = await response.json();
-      
-      // Add assistant's response to messages
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: data.result.text || "Sorry, I couldn't process that request.",
-          timestamp: new Date(),
-          // Add code suggestions if they exist
-          ...(data.result.codeSuggestions && {
-            codeSuggestions: data.result.codeSuggestions
-          })
-        },
-      ]);
-
-      // If there are code suggestions, process the first one immediately
-      if (data.result.codeSuggestions && data.result.codeSuggestions.length > 0) {
-        processCodeSuggestion(data.result.codeSuggestions[0]);
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "Sorry, there was an error processing your request.",
-          timestamp: new Date(),
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // Function to process code suggestions
-  const processCodeSuggestion = (suggestion: {
+  const processCodeSuggestion = useCallback((suggestion: {
     code: string;
     language: string;
     description?: string;
@@ -295,7 +167,146 @@ export default function ChatWindow() {
         isActive: true
       });
     }
+  }, [codeFiles, sandboxes, activeSandbox]);
+
+  const handleSendMessage = useCallback(async (dontSave?: boolean, message?: string) => {
+    if (!input.trim() && !message) return
+
+    // Add user message
+    const userMessage = {
+      role: "user",
+      content: message || input,
+      timestamp: new Date(),
+    };
+    if (!dontSave) {
+      setMessages((prev) => [...prev, userMessage]);
+    }
+    setInput("");
+    setIsLoading(true);
+
+    console.log(userMessage);
+
+    try {
+      // Format messages for the API
+      const formattedMessages = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
+      const response = await fetch('/api/geminichat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          message: message || input,
+          messages: formattedMessages, // Include chat history
+          repo: repoName,
+          prNumber: prNumber,
+          owner: owner
+        }),
+      });
+
+      console.log("response", response)
+
+      if (!response.ok) {
+        throw new Error('Failed to get response from Gemini');
+      }
+
+      const data = await response.json();
+
+      console.log("data", data)
+      
+      // Add assistant's response to messages
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: data.result.text || "Sorry, I couldn't process that request.",
+          timestamp: new Date(),
+          // Add code suggestions if they exist
+          ...(data.result.codeSuggestions && {
+            codeSuggestions: data.result.codeSuggestions
+          })
+        },
+      ]);
+
+      // If there are code suggestions, process the first one immediately
+      if (data.result.codeSuggestions && data.result.codeSuggestions.length > 0) {
+        processCodeSuggestion(data.result.codeSuggestions[0]);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "Sorry, there was an error processing your request.",
+          timestamp: new Date(),
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [messages, input, owner, prNumber, repoName, processCodeSuggestion]);
+
+  // Load messages from localStorage on component mount
+  useEffect(() => {
+    const savedMessages = localStorage.getItem(localStorageKey);
+    if (savedMessages) {
+      try {
+        const parsedMessages = JSON.parse(savedMessages);
+        // Convert string timestamps back to Date objects
+        const messagesWithDates = parsedMessages.map((msg: Message) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        }));
+        setMessages(messagesWithDates);
+      } catch (error) {
+        console.error('Error loading messages from localStorage:', error);
+        // If there's an error, start with the default message
+        setMessages([{
+          role: "assistant",
+          content: "Hi there! I'm your coding assistant. How can I help you today?",
+          timestamp: new Date(),
+        }]);
+      }
+    } else {
+      if (!messages.length) {
+        console.log("No messages found, getting first message")
+        async function getFirstMessage() {
+          await handleSendMessage(true, "Please tell me how my code looks")
+        }
+        getFirstMessage()
+      }
+    }
+  }, []);
+
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    if (!messages.length) return
+    try {
+      localStorage.setItem(localStorageKey, JSON.stringify(messages));
+    } catch (error) {
+      console.error('Error saving messages to localStorage:', error);
+    }
+  }, [messages, localStorageKey]);
+
+  // Add a function to clear chat history
+  const clearChatHistory = () => {
+    setMessages([{
+      role: "assistant",
+      content: "Hi there! I'm your coding assistant. How can I help you today?",
+      timestamp: new Date(),
+    }]);
+    localStorage.removeItem(localStorageKey);
   };
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
+
 
   // Helper function to get file extension from language
   const getFileExtensionFromLanguage = (language: string): string => {

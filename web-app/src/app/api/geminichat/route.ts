@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { NextRequest } from "next/server";
 import { Octokit } from "@octokit/rest";
 import { console } from "inspector";
+import { default_system_instruction } from "./prompts";
 
 // Define types for our PR file structure
 export interface PRFile {
@@ -49,6 +50,25 @@ export async function POST(request: NextRequest) {
       parts: [{ text: msg.content }]
     })) : [];
 
+    
+
+    const startingMessages = [{
+      role: "user",
+      parts: [
+        {
+          text: `${default_system_instruction}`
+        },
+      ],
+    },
+    {
+      role: "user",
+      parts: [
+        {
+          text: formattedPRCode
+        },
+      ],
+    },]
+
     // Add the current message
     const currentMessage = {
       role: 'user',
@@ -57,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     const response = await ai.models.generateContent({
       model: "gemini-2.0-flash",
-      contents: [...chatHistory, currentMessage],
+      contents: [...startingMessages, ...chatHistory, currentMessage],
     });
 
     // Log the response structure for debugging
