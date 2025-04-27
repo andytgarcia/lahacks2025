@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import { Box, Paper, Typography, TextField, Button, Avatar, IconButton, Chip, CircularProgress} from "@mui/material"
 import SendIcon from "@mui/icons-material/Send"
 import CodeIcon from "@mui/icons-material/Code"
@@ -16,14 +16,10 @@ import CodeEditor from "@/app/components/ui/code-editor"
 import CodeDiffView from "@/app/components/ui/CodeDiffView"
 import CodeSandbox from "@/app/components/code-sandbox"
 import ReactMarkdown from 'react-markdown'
+import { useSearchParams } from "next/navigation"
 
-export default function ChatWindow() {
-  const { mode, toggleTheme } = useTheme()
-  const [input, setInput] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  // Update the message interface to include potential code suggestions
-  const [messages, setMessages] = useState<{
-    role: string
+type Message = {
+  role: string
     content: string
     timestamp: Date
     isCode?: boolean
@@ -34,13 +30,21 @@ export default function ChatWindow() {
       description?: string
       fileId?: string
     }>
-  }[]>([
-    {
-      role: "assistant",
-      content: "Hi there! I'm your coding assistant. How can I help you today?",
-      timestamp: new Date(),
-    },
-  ])
+}
+
+export default function ChatWindow() {
+  // Update the message interface to include potential code suggestions
+  const searchParams = useSearchParams();
+  
+  const repoName = useMemo(() => searchParams.get('repo'), [searchParams])
+  const prNumber = useMemo(() => searchParams.get('pr'), [searchParams])
+  const owner = useMemo(() => searchParams.get('owner'), [searchParams])
+
+  const { mode, toggleTheme } = useTheme()
+  const [input, setInput] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [messages, setMessages] = useState<Message[]>([])
+
   const [codeFiles, setCodeFiles] = useState([
     {
       id: "file1",
@@ -83,14 +87,20 @@ export default function ChatWindow() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  const localStorageKey = useMemo(() => `geminiChatMessages-${repoName}-${prNumber}-${owner}`, [
+    repoName,
+    prNumber,
+    owner
+  ]);
+
   // Load messages from localStorage on component mount
   useEffect(() => {
-    const savedMessages = localStorage.getItem('geminiChatMessages');
+    const savedMessages = localStorage.getItem(localStorageKey);
     if (savedMessages) {
       try {
         const parsedMessages = JSON.parse(savedMessages);
         // Convert string timestamps back to Date objects
-        const messagesWithDates = parsedMessages.map((msg: any) => ({
+        const messagesWithDates = parsedMessages.map((msg: Message) => ({
           ...msg,
           timestamp: new Date(msg.timestamp)
         }));
@@ -117,11 +127,11 @@ export default function ChatWindow() {
   // Save messages to localStorage whenever they change
   useEffect(() => {
     try {
-      localStorage.setItem('geminiChatMessages', JSON.stringify(messages));
+      localStorage.setItem(localStorageKey, JSON.stringify(messages));
     } catch (error) {
       console.error('Error saving messages to localStorage:', error);
     }
-  }, [messages]);
+  }, [messages, localStorageKey]);
 
   // Add a function to clear chat history
   const clearChatHistory = () => {
@@ -130,7 +140,7 @@ export default function ChatWindow() {
       content: "Hi there! I'm your coding assistant. How can I help you today?",
       timestamp: new Date(),
     }]);
-    localStorage.removeItem('geminiChatMessages');
+    localStorage.removeItem(localStorageKey);
   };
 
   // Auto-scroll to bottom when new messages arrive
@@ -166,9 +176,9 @@ export default function ChatWindow() {
         body: JSON.stringify({ 
           message: input,
           messages: formattedMessages, // Include chat history
-          repo: 'lahacks2025',
-          prNumber: '1',
-          owner: 'andytgarcia'
+          repo: repoName,
+          prNumber: prNumber,
+          owner: owner
         }),
       });
 
